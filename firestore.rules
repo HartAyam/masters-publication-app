@@ -1,0 +1,141 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function hasRole(roles) {
+      return isAuthenticated() && getUserData().role in roles;
+    }
+    
+    function isAdmin() {
+      return hasRole(['Admin', 'Director']);
+    }
+    
+    function isAccountant() {
+      return hasRole(['Admin', 'Director', 'Accountant']);
+    }
+    
+    function isManager() {
+      return hasRole(['Admin', 'Director', 'Accountant', 'Manager']);
+    }
+
+    function isStaff() {
+      return hasRole(['Admin', 'Director', 'Accountant', 'Manager', 'Cashier']);
+    }
+
+    // Validation Helpers
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidString(field, min, max) {
+      return request.resource.data[field] is string && 
+             request.resource.data[field].size() >= min && 
+             request.resource.data[field].size() <= max;
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // Users collection - PII protection
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.uid is string &&
+               data.email is string &&
+               data.role in ['Cashier', 'Manager', 'Accountant', 'Director', 'Admin'] &&
+               data.branchId in ['Gyinyase', 'Kasoa', 'Madina', 'Santasi', 'ALL'];
+      }
+
+      allow read: if isAuthenticated() && (isOwner(userId) || isAccountant());
+      allow create: if isAuthenticated() && isOwner(userId) && 
+                      request.resource.data.role == 'Cashier' && // Default role for self-signup
+                      isValidUser(request.resource.data);
+      allow update: if isAuthenticated() && (
+                      (isOwner(userId) && request.resource.data.role == resource.data.role) || 
+                      isAdmin()
+                    ) && isValidUser(request.resource.data);
+    }
+
+    // Products collection
+    match /products/{productId} {
+      function isValidProduct(data) {
+        return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+               data.price is number && data.price >= 0 &&
+               data.stockLevel is number &&
+               data.branchId in ['Gyinyase', 'Kasoa', 'Madina', 'Santasi', 'ALL'];
+      }
+
+      allow read: if isAuthenticated();
+      allow create, update: if isManager() && isValidProduct(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Transactions collection
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isAccountant();
+    }
+
+    // Payments collection
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isAccountant();
+    }
+
+    // Expenses collection
+    match /expenses/{expenseId} {
+      allow read: if isAccountant();
+      allow create: if isManager();
+      allow update: if isAccountant();
+    }
+
+    // Activity Logs collection
+    match /activity_logs/{logId} {
+      allow read: if isAccountant();
+      allow create: if isAuthenticated();
+    }
+
+    // Payroll collection
+    match /payroll/{recordId} {
+      allow read, write: if isAccountant();
+    }
+
+    // Customers collection
+    match /customers/{customerId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isStaff();
+    }
+
+    // Suppliers collection
+    match /suppliers/{supplierId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isManager();
+    }
+    
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

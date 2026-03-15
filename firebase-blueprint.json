@@ -1,0 +1,41 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user account details and roles.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["Cashier", "Manager", "Accountant", "Director", "Admin"] },
+        "branchId": { "type": "string", "enum": ["Gyinyase", "Kasoa", "Madina", "Santasi", "ALL"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "branchId"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Inventory items.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "sku": { "type": "string" },
+        "price": { "type": "number" },
+        "stockLevel": { "type": "number" },
+        "branchId": { "type": "string" }
+      },
+      "required": ["name", "price", "stockLevel", "branchId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles collection."
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Inventory products collection."
+    }
+  }
+}
