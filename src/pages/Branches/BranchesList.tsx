@@ -23,6 +23,7 @@ export default function BranchesList() {
   const [location, setLocation] = useState('');
   const [managerId, setManagerId] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+  const [momoNumber, setMomoNumber] = useState('');
 
   const canEdit = ['Admin', 'Director', 'Accountant'].includes(userProfile?.role || '');
 
@@ -96,6 +97,7 @@ export default function BranchesList() {
         location,
         managerId,
         contactPhone,
+        momoNumber,
         isActive: true,
         createdAt: serverTimestamp(),
       });
@@ -115,6 +117,7 @@ export default function BranchesList() {
       setLocation('');
       setManagerId('');
       setContactPhone('');
+      setMomoNumber('');
       fetchBranches();
       alert('Branch added successfully');
     } catch (error) {
@@ -193,6 +196,12 @@ export default function BranchesList() {
                 <Phone size={16} className="text-gray-400" />
                 <span className="font-medium">Contact:</span> {branch.contactPhone || 'No Contact Info'}
               </div>
+              {branch.momoNumber && (
+                <div className="flex items-center gap-2">
+                  <Phone size={16} className="text-gray-400" />
+                  <span className="font-medium">MoMo:</span> {branch.momoNumber}
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center text-[10px] text-blue-600 font-bold">
                   {branch.employeeCount || 0}
@@ -266,6 +275,15 @@ export default function BranchesList() {
                   className="w-full p-2 border border-gray-200 rounded-lg"
                   value={contactPhone}
                   onChange={e => setContactPhone(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">MoMo Number</label>
+                <input
+                  type="text"
+                  className="w-full p-2 border border-gray-200 rounded-lg"
+                  value={momoNumber}
+                  onChange={e => setMomoNumber(e.target.value)}
                 />
               </div>
 

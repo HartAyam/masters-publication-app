@@ -173,7 +173,7 @@ export default function AuditLogsList() {
             <tr>
               <th className="p-4 font-medium text-gray-600">Timestamp</th>
               <th className="p-4 font-medium text-gray-600">Action</th>
-              <th className="p-4 font-medium text-gray-600">User</th>
+              <th className="p-4 font-medium text-gray-600">Name</th>
               <th className="p-4 font-medium text-gray-600">Role</th>
               <th className="p-4 font-medium text-gray-600">Branch</th>
               <th className="p-4 font-medium text-gray-600">Details</th>
@@ -190,7 +190,7 @@ export default function AuditLogsList() {
                   {log.timestamp?.toDate ? format(log.timestamp.toDate(), 'PP pp') : 'N/A'}
                 </td>
                 <td className="p-4 font-medium text-gray-900">{log.action}</td>
-                <td className="p-4 text-gray-500">{log.userId}</td>
+                <td className="p-4 text-gray-500">{log.userName || log.userId}</td>
                 <td className="p-4">
                   <span className="px-2 py-1 bg-gray-100 rounded-full text-xs font-medium">
                     {log.userRole}
@@ -244,6 +244,10 @@ export default function AuditLogsList() {
                 <div>
                   <div className="text-gray-500 mb-1">Action</div>
                   <div className="font-medium">{selectedLog.action}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 mb-1">User Name</div>
+                  <div className="font-medium">{selectedLog.userName || 'N/A'}</div>
                 </div>
                 <div>
                   <div className="text-gray-500 mb-1">User ID</div>

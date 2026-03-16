@@ -34,6 +34,7 @@ export default function POS() {
   const [staff, setStaff] = useState<UserProfile[]>([]);
   const [suppliedBy, setSuppliedBy] = useState('');
   const [currentBranch, setCurrentBranch] = useState<BranchModel | null>(null);
+  const [discount, setDiscount] = useState<number>(0);
   
   const [loading, setLoading] = useState(false);
 
@@ -146,7 +147,13 @@ export default function POS() {
     ));
   };
 
-  const calculateTotal = () => cart.reduce((sum, item) => sum + item.total, 0);
+  const calculateTotal = () => {
+    const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
+    const discountAmount = (discount / 100) * subtotal;
+    return subtotal - discountAmount;
+  };
+
+  const calculateSubtotal = () => cart.reduce((sum, item) => sum + item.total, 0);
 
   const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -214,6 +221,7 @@ export default function POS() {
 
     try {
       const totalAmount = calculateTotal();
+      const subtotal = calculateSubtotal();
       
       // Determine Status and Payment
       let status = 'Completed';
@@ -239,6 +247,7 @@ export default function POS() {
         type: transactionType,
         items: cart.filter(i => i.quantity > 0),
         totalAmount,
+        discount,
         amountPaid,
         balanceDue,
         customerId: selectedCustomer.id,
@@ -271,7 +280,8 @@ export default function POS() {
         `Amount: ${formatCurrency(totalAmount)} by ${userProfile.email}`,
         userProfile.uid,
         userProfile.role,
-        userProfile.branchId
+        userProfile.branchId,
+        userProfile.displayName || userProfile.email
       );
 
       // 4. Update Stock
@@ -296,6 +306,7 @@ export default function POS() {
       setAccountNumber('');
       setBankName('');
       setSuppliedBy('');
+      setDiscount(0);
       
       // Refresh products (simple re-fetch)
       const q = isGlobalUser(userProfile.role) 
@@ -581,8 +592,27 @@ export default function POS() {
           </div>
 
           <div className="flex justify-between items-center pt-2">
-            <span className="text-gray-500">Total</span>
-            <span className="text-2xl font-bold text-gray-900">{formatCurrency(calculateTotal())}</span>
+            <span className="text-gray-500">Subtotal</span>
+            <span className="text-lg font-medium text-gray-900">{formatCurrency(calculateSubtotal())}</span>
+          </div>
+
+          <div className="flex items-center gap-4 pt-2">
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-gray-700 uppercase mb-1">Discount (%)</label>
+              <input 
+                type="number"
+                min="0"
+                max="100"
+                className="w-full p-2 border border-gray-200 rounded-lg text-sm"
+                placeholder="0"
+                value={discount === 0 ? '' : discount}
+                onChange={(e) => setDiscount(Number(e.target.value))}
+              />
+            </div>
+            <div className="text-right">
+              <span className="text-gray-500 block text-xs uppercase font-medium mb-1">Total</span>
+              <span className="text-2xl font-bold text-gray-900">{formatCurrency(calculateTotal())}</span>
+            </div>
           </div>
 
           <button

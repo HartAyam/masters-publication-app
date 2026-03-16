@@ -46,6 +46,7 @@ export default function PaymentsList() {
   const [custSearchTerm, setCustSearchTerm] = useState('');
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'MoMo' | 'Bank'>('Cash');
+  const [accountNumber, setAccountNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
@@ -132,6 +133,7 @@ export default function PaymentsList() {
         receivedById: userProfile.uid,
         date: serverTimestamp(),
         paymentMethod,
+        accountNumber: paymentMethod !== 'Cash' ? accountNumber : '',
         branchId: isGlobalUser(userProfile.role) ? selectedCustomer.primaryBranch : userProfile.branchId,
         notes
       };
@@ -156,6 +158,7 @@ export default function PaymentsList() {
 
       setShowAddModal(false);
       setAmount('');
+      setAccountNumber('');
       setSelectedCustomer(null);
       setNotes('');
       alert('Payment recorded successfully!');
@@ -470,6 +473,18 @@ export default function PaymentsList() {
                     <option value="Bank">Bank Transfer</option>
                   </select>
                 </div>
+                {paymentMethod !== 'Cash' && (
+                  <div className="space-y-1">
+                    <label className="block text-sm font-medium text-gray-700">Account/Reference Number</label>
+                    <input 
+                      type="text"
+                      className="w-full p-2 border border-gray-200 rounded-lg"
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value)}
+                      placeholder={paymentMethod === 'MoMo' ? "MoMo Number" : "Transaction ID / Acc No"}
+                    />
+                  </div>
+                )}
                 <div className="space-y-1">
                   <label className="block text-sm font-medium text-gray-700">Date</label>
                   <input 

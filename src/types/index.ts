@@ -61,6 +61,7 @@ export interface Transaction {
   type: 'Cash Sale' | 'Credit Sale' | 'Deposit' | 'Stock Return' | 'Supply Note';
   items: SaleItem[];
   totalAmount: number;
+  discount?: number; // Percentage discount
   amountPaid: number;
   balanceDue: number;
   customerId?: string;
@@ -93,6 +94,7 @@ export interface Payment {
   receivedById: string;
   date: any;
   paymentMethod: 'Bank' | 'MoMo' | 'Cash';
+  accountNumber?: string;
   branchId: Branch;
   notes?: string;
 }
@@ -127,6 +129,7 @@ export interface ActivityLog {
   action: string;
   details: string;
   userId: string;
+  userName?: string;
   userRole: Role;
   branchId: Branch;
   timestamp: any;
@@ -165,6 +168,7 @@ export interface BranchModel {
   managerId?: string;
   managerName?: string;
   contactPhone?: string;
+  momoNumber?: string;
   employeeCount?: number;
   isActive: boolean;
 }

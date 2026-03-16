@@ -1,0 +1,13 @@
+kind: "AppHostingBackend"
+schemaVersion: "v1"
+
+# Environment variables available at runtime
+env:
+  - variable: NODE_ENV
+    value: "production"
+  - variable: FIREBASE_SERVICE_ACCOUNT_KEY
+    secret: FIREBASE_SERVICE_ACCOUNT_KEY
+  - variable: VITE_FIREBASE_PROJECT_ID
+    value: "your-project-id" # Replace with your actual Project ID
+  - variable: VITE_FIREBASE_DATABASE_ID
+    value: "(default)"

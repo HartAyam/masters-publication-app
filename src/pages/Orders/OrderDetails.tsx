@@ -427,49 +427,56 @@ export default function OrderDetails() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden" id="invoice-print">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative" id="invoice-print">
+        {/* Watermark */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05] z-0">
+          <img src="/logo.png" alt="" className="w-1/2 object-contain" />
+        </div>
+
         {/* Invoice Header */}
-        <div className="p-8 border-b border-gray-100">
-          <div className="flex flex-col items-center text-center mb-8">
-            <div className="flex items-center gap-3 mb-2">
-              <img src="/logo.png" alt="Logo" className="h-12 w-12 object-contain" onError={(e) => (e.currentTarget.style.display = 'none')} />
-              <h1 className="text-3xl font-black text-gray-900 tracking-tighter">MASTERS PUBLICATION</h1>
+        <div className="p-4 border-b border-gray-100 relative z-10">
+          <div className="flex flex-col items-center text-center mb-4">
+            <img src="/logo.png" alt="Logo" className="h-20 w-20 object-contain mb-2" onError={(e) => (e.currentTarget.style.display = 'none')} />
+            <h1 className="text-2xl font-black text-gray-900 tracking-tighter">MASTERS PUBLICATION</h1>
+            <p className="text-base font-bold text-gray-700">{order.branchId} Branch</p>
+            <p className="text-xs text-gray-500">{branch?.location || 'Ghana'}</p>
+            <div className="flex items-center gap-4 text-xs text-gray-500">
+              {branch?.contactPhone && <span><span className="font-bold">Tel:</span> {branch.contactPhone}</span>}
+              {branch?.momoNumber && <span><span className="font-bold">MoMo:</span> {branch.momoNumber}</span>}
             </div>
-            <p className="text-lg font-bold text-gray-700">{order.branchId} Branch</p>
-            <p className="text-sm text-gray-500">{branch?.location || 'Ghana'}</p>
-            <p className="text-sm text-gray-500">kwamentimmasters@gmail.com</p>
+            <p className="text-xs text-gray-500">kwamentimmasters@gmail.com</p>
           </div>
 
-          <div className="flex flex-col items-center text-center mb-10">
-            <h2 className="text-xl font-black uppercase tracking-[0.2em] text-gray-900 border-b-2 border-gray-900 px-8 pb-1 mb-2">
+          <div className="flex flex-col items-center text-center mb-6">
+            <h2 className="text-lg font-black uppercase tracking-[0.2em] text-gray-900 border-b-2 border-gray-900 px-6 pb-0.5 mb-1">
               {order.type === 'Supply Note' ? 'Supply Note' : 'Invoice'}
             </h2>
-            <p className="text-sm font-mono text-gray-500">#{order.id}</p>
-            <p className="text-sm text-gray-900 mt-1 uppercase tracking-widest font-bold">
+            <p className="text-xs font-mono text-gray-500">#{order.id}</p>
+            <p className="text-xs text-gray-900 mt-0.5 uppercase tracking-widest font-bold">
               Date: {order.date?.toDate ? format(order.date.toDate(), 'dd MMM yyyy, HH:mm') : (order.date ? format(new Date(order.date), 'dd MMM yyyy, HH:mm') : 'N/A')}
             </p>
             {order.originalTransactionId && (
-              <p className="text-[10px] text-gray-400 mt-1">Ref: #{order.originalTransactionId}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Ref: #{order.originalTransactionId}</p>
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-12 mb-10">
-            <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-6 mb-6">
+            <div className="space-y-2">
               <div>
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Bill To:</h3>
-                <div className="space-y-1">
-                  <p className="text-lg font-bold text-gray-900">{order.customerName}</p>
-                  <p className="text-sm text-gray-600">{customer?.address || 'N/A'}</p>
-                  <p className="text-sm text-gray-600">{order.customerPhone || 'N/A'}</p>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Bill To:</h3>
+                <div className="space-y-0.5">
+                  <p className="text-base font-bold text-gray-900">{order.customerName}</p>
+                  <p className="text-xs text-gray-600">{customer?.address || 'N/A'}</p>
+                  <p className="text-xs text-gray-600">{order.customerPhone || 'N/A'}</p>
                 </div>
               </div>
             </div>
-            <div className="space-y-4 text-right">
+            <div className="space-y-2 text-right">
               <div>
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
                   {order.type === 'Supply Note' ? 'Supply Details:' : 'Payment Details:'}
                 </h3>
-                <div className="space-y-1 text-sm">
+                <div className="space-y-0.5 text-xs">
                   <p className="text-gray-600"><span className="font-bold text-gray-900">Type:</span> {order.type}</p>
                   {order.type !== 'Supply Note' && (
                     <>
@@ -487,51 +494,61 @@ export default function OrderDetails() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-12 py-4 border-y border-gray-100 mb-8">
+          <div className="grid grid-cols-2 gap-6 py-2 border-y border-gray-100 mb-6">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Prepared By:</span>
-              <span className="text-sm font-bold text-gray-900">{order.preparedBy || 'N/A'}</span>
+              <span className="text-xs font-bold text-gray-900">{order.preparedBy || 'N/A'}</span>
             </div>
             <div className="flex items-center gap-2 justify-end">
               <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Supplied By:</span>
-              <span className="text-sm font-bold text-gray-900">{order.suppliedBy || 'N/A'}</span>
+              <span className="text-xs font-bold text-gray-900">{order.suppliedBy || 'N/A'}</span>
             </div>
           </div>
 
           {/* Order Items */}
-          <table className="w-full text-left mb-8">
+          <table className="w-full text-left mb-6">
             <thead>
               <tr className="border-b-2 border-gray-900 text-[10px] font-black uppercase tracking-widest text-gray-900">
-                <th className="py-3">Item Description</th>
-                <th className="py-3 text-right">Qty</th>
-                <th className="py-3 text-right">Unit Price</th>
-                <th className="py-3 text-right">Total</th>
+                <th className="py-2">Item Description</th>
+                <th className="py-2 text-right">Qty</th>
+                <th className="py-2 text-right">Unit Price</th>
+                <th className="py-2 text-right">Total</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {order.items.map((item, index) => (
-                <tr key={index} className="text-sm">
-                  <td className="py-4 font-medium text-gray-900">{item.productName}</td>
-                  <td className="py-4 text-right text-gray-600">{item.quantity}</td>
-                  <td className="py-4 text-right text-gray-600">{formatCurrency(item.price)}</td>
-                  <td className="py-4 text-right font-bold text-gray-900">{formatCurrency(item.total)}</td>
+                <tr key={index} className="text-xs">
+                  <td className="py-1.5 font-medium text-gray-900">{item.productName}</td>
+                  <td className="py-1.5 text-right text-gray-600">{item.quantity}</td>
+                  <td className="py-1.5 text-right text-gray-600">{formatCurrency(item.price)}</td>
+                  <td className="py-1.5 text-right font-bold text-gray-900">{formatCurrency(item.total)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot className="border-t-2 border-gray-900">
               <tr>
-                <td colSpan={3} className="py-4 text-right text-sm font-black uppercase tracking-widest text-gray-900">Total Amount</td>
-                <td className="py-4 text-right text-lg font-black text-gray-900">{formatCurrency(order.totalAmount)}</td>
+                <td colSpan={3} className="py-2 text-right text-xs font-black uppercase tracking-widest text-gray-900">Subtotal</td>
+                <td className="py-2 text-right text-base font-black text-gray-900">{formatCurrency(order.items.reduce((sum, i) => sum + i.total, 0))}</td>
+              </tr>
+              {order.discount > 0 && (
+                <tr>
+                  <td colSpan={3} className="py-1 text-right text-[10px] font-bold text-rose-600 uppercase tracking-widest">Discount ({order.discount}%)</td>
+                  <td className="py-1 text-right text-xs font-bold text-rose-600">-{formatCurrency((order.items.reduce((sum, i) => sum + i.total, 0) * order.discount) / 100)}</td>
+                </tr>
+              )}
+              <tr className="bg-gray-50">
+                <td colSpan={3} className="py-2 text-right text-xs font-black uppercase tracking-widest text-gray-900">Total Amount</td>
+                <td className="py-2 text-right text-base font-black text-gray-900">{formatCurrency(order.totalAmount)}</td>
               </tr>
               {order.type === 'Credit Sale' && (
                 <>
                   <tr>
-                    <td colSpan={3} className="py-2 text-right text-xs font-bold text-gray-500 uppercase tracking-widest">Payment/Credits</td>
-                    <td className="py-2 text-right text-sm font-bold text-gray-700">{formatCurrency(customer?.totalDebt || 0)}</td>
+                    <td colSpan={3} className="py-1 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Payment/Credits</td>
+                    <td className="py-1 text-right text-xs font-bold text-gray-700">{formatCurrency(customer?.totalDebt || 0)}</td>
                   </tr>
                   <tr className="bg-gray-900 text-white">
-                    <td colSpan={3} className="py-3 text-right text-sm font-black uppercase tracking-widest px-4">Balance Due</td>
-                    <td className="py-3 text-right text-lg font-black px-4">{formatCurrency(customer?.totalDebt || 0)}</td>
+                    <td colSpan={3} className="py-2 text-right text-xs font-black uppercase tracking-widest px-4">Balance Due</td>
+                    <td className="py-2 text-right text-base font-black px-4">{formatCurrency(customer?.totalDebt || 0)}</td>
                   </tr>
                 </>
               )}
@@ -539,7 +556,7 @@ export default function OrderDetails() {
           </table>
 
           {/* Signatures */}
-          <div className="grid grid-cols-3 gap-8 mt-20">
+          <div className="grid grid-cols-3 gap-8 mt-10">
             <div className="text-center">
               <div className="border-b border-gray-900 mb-2"></div>
               <p className="text-[10px] font-black uppercase tracking-widest text-gray-900">Cashier Sign</p>

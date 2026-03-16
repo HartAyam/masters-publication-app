@@ -20,6 +20,7 @@ export default function BranchDetails() {
   const [location, setLocation] = useState('');
   const [managerId, setManagerId] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+  const [momoNumber, setMomoNumber] = useState('');
   const [isActive, setIsActive] = useState(true);
 
   const canEdit = ['Admin', 'Director', 'Accountant'].includes(userProfile?.role || '');
@@ -57,6 +58,7 @@ export default function BranchDetails() {
         setLocation(data.location);
         setManagerId(data.managerId || '');
         setContactPhone(data.contactPhone || '');
+        setMomoNumber(data.momoNumber || '');
         setIsActive(data.isActive);
       } else {
         alert('Branch not found');
@@ -79,6 +81,7 @@ export default function BranchDetails() {
         location,
         managerId,
         contactPhone,
+        momoNumber,
         isActive
       });
       setIsEditing(false);
@@ -162,6 +165,15 @@ export default function BranchDetails() {
                     onChange={e => setContactPhone(e.target.value)}
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">MoMo Number</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border border-gray-200 rounded-lg"
+                    value={momoNumber}
+                    onChange={e => setMomoNumber(e.target.value)}
+                  />
+                </div>
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -219,6 +231,15 @@ export default function BranchDetails() {
                   <div>
                     <h3 className="text-sm font-medium text-gray-500">Contact</h3>
                     <p className="text-lg font-medium text-gray-900">{branch.contactPhone || 'N/A'}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="bg-green-50 p-2 rounded-lg">
+                    <Phone className="text-green-600" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500">MoMo Number</h3>
+                    <p className="text-lg font-medium text-gray-900">{branch.momoNumber || 'N/A'}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
