@@ -59,7 +59,7 @@ export default function Login() {
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <img src="/logo.png" alt="Masters Publication Logo" className="h-24 w-auto object-contain" />
+            <img src="../logo.png" alt="Masters Publication Logo" className="h-24 w-auto object-contain" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Masters Publication</h1>
           <p className="text-gray-500 mt-2">Unified Management Platform</p>
