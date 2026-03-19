@@ -16,7 +16,7 @@ export const logActivity = async (
       action,
       details,
       userId,
-      userName,
+      userName: userName || 'Unknown User',
       userRole,
       branchId,
       timestamp: serverTimestamp(),

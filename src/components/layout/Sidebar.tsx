@@ -46,6 +46,8 @@ export const Sidebar = () => {
     { name: 'Suppliers', href: '/suppliers', icon: Truck, roles: ['Manager', 'Accountant', 'Director', 'Admin'] },
     { name: 'Payroll', href: '/payroll', icon: DollarSign, roles: ['Accountant', 'Director', 'Admin'] },
     { name: 'Financials', href: '/financials', icon: TrendingUp, roles: ['Accountant', 'Director', 'Admin'] },
+    { name: 'Fixed Assets', href: '/fixed-assets', icon: Package, roles: ['Accountant', 'Director', 'Admin'] },
+    { name: 'Payments By Source', href: '/payments-by-source', icon: CreditCard, roles: ['Accountant', 'Director', 'Admin'] },
     { name: 'Audit Logs', href: '/audit-logs', icon: ShieldAlert, roles: ['Accountant', 'Director', 'Admin'] },
     { name: 'Admin', href: '/admin', icon: Settings, roles: ['Director','Admin'] },
   ];
@@ -87,7 +89,7 @@ export const Sidebar = () => {
               <img 
                 src="/logo.png" 
                 alt="Logo" 
-                className="w-10 h-10 rounded p-1 object-contain shrink-0"
+                className="w-10 h-10 rounded bg-white p-1 object-contain shrink-0"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}

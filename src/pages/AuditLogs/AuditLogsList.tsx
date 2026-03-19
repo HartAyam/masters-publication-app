@@ -5,6 +5,7 @@ import { ActivityLog, Role } from '@/types';
 import { Search, Eye, X, Download, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { exportToCSV, printDiv } from '@/lib/exportUtils';
+import Pagination from '@/components/common/Pagination';
 
 const PAGE_SIZE = 20;
 
@@ -109,6 +110,12 @@ export default function AuditLogsList() {
     exportToCSV(dataToExport, `AuditLogs_${format(new Date(), 'yyyy-MM-dd')}`);
   };
 
+  const totalPages = Math.ceil(filteredLogs.length / PAGE_SIZE);
+  const paginatedLogs = filteredLogs.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE
+  );
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -180,7 +187,7 @@ export default function AuditLogsList() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filteredLogs.map((log) => (
+            {paginatedLogs.map((log) => (
               <tr 
                 key={log.id} 
                 className="hover:bg-gray-50 cursor-pointer"
@@ -202,7 +209,7 @@ export default function AuditLogsList() {
                 </td>
               </tr>
             ))}
-            {filteredLogs.length === 0 && !loading && (
+            {paginatedLogs.length === 0 && !loading && (
               <tr>
                 <td colSpan={6} className="p-8 text-center text-gray-500">No logs found</td>
               </tr>
@@ -211,18 +218,14 @@ export default function AuditLogsList() {
         </table>
       </div>
         
-        {/* Load More */}
-        {lastVisible && (
-          <div className="p-4 border-t border-gray-100 flex justify-center">
-            <button
-              onClick={() => fetchLogs(false)}
-              disabled={loading}
-              className="text-blue-600 hover:underline disabled:opacity-50"
-            >
-              {loading ? 'Loading...' : 'Load More'}
-            </button>
-          </div>
-        )}
+        {/* Pagination */}
+        <div className="p-4 border-t border-gray-100">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
+        </div>
       </div>
 
       {/* Details Modal */}

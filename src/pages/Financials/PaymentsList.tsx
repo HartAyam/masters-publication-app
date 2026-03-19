@@ -49,22 +49,23 @@ export default function PaymentsList() {
   const [accountNumber, setAccountNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 25;
+  const itemsPerPage = 20;
 
   useEffect(() => {
     if (!userProfile) return;
 
     let q = query(collection(db, 'payments'), orderBy('date', 'desc'));
     
-    // Apply branch filtering
-    if (!isGlobalUser(userProfile.role)) {
-      q = query(q, where('branchId', '==', userProfile.branchId));
-    } else if (selectedBranch !== 'ALL') {
-      q = query(q, where('branchId', '==', selectedBranch));
-    }
-
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+      let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+      
+      // Apply branch filtering in memory
+      if (!isGlobalUser(userProfile.role)) {
+        data = data.filter(p => p.branchId === userProfile.branchId);
+      } else if (selectedBranch !== 'ALL') {
+        data = data.filter(p => p.branchId === selectedBranch);
+      }
+      
       setPayments(data);
       setLoading(false);
     });
@@ -293,14 +294,14 @@ export default function PaymentsList() {
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Customer</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Amount</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Method</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Received By</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Branch</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right no-print">Action</th>
+              <tr className="bg-gray-50 border-b border-gray-100 text-left">
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Date</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Customer</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right whitespace-nowrap">Amount</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Method</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Received By</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Branch</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right no-print whitespace-nowrap">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -323,13 +324,13 @@ export default function PaymentsList() {
                       <div className="text-sm text-gray-900">{payment.date?.toDate ? format(payment.date.toDate(), 'MMM dd, yyyy') : 'Pending...'}</div>
                       <div className="text-[10px] text-gray-400">{payment.date?.toDate ? format(payment.date.toDate(), 'HH:mm') : ''}</div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{payment.customerName}</div>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
                       <div className="text-sm font-bold text-emerald-600">{formatCurrency(payment.amount)}</div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <span className={cn(
                         "px-2 py-1 rounded-full text-[10px] font-bold uppercase",
                         payment.paymentMethod === 'Cash' ? "bg-amber-100 text-amber-700" :
@@ -339,13 +340,13 @@ export default function PaymentsList() {
                         {payment.paymentMethod}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-600">{payment.receivedBy}</div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-xs text-gray-500">{payment.branchId}</div>
                     </td>
-                    <td className="px-6 py-4 text-right no-print" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-6 py-4 text-right no-print whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <Link 
                         to={`/payments/${payment.id}`}
                         className="p-2 text-gray-400 hover:text-blue-600 transition-colors inline-block"

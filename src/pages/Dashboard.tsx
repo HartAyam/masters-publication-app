@@ -6,7 +6,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
   ResponsiveContainer, LineChart, Line, Cell, PieChart, Pie
 } from 'recharts';
-import { ActivityLog, Transaction, Product, Customer, Expense, PayrollRecord, Branch, Payment } from '@/types';
+import { ActivityLog, Transaction, Product, Customer, Expense, PayrollRecord, Branch, Payment, Supplier } from '@/types';
 import { 
   Activity, DollarSign, Package, AlertTriangle, TrendingUp, 
   TrendingDown, Users, CreditCard, ShoppingCart, Calendar, Filter,
@@ -21,9 +21,15 @@ import { useNavigate } from 'react-router-dom';
 
 interface DashboardStats {
   totalRevenue: number;
+  totalSales: number;
+  cashSales: number;
+  creditSales: number;
+  depositSales: number;
+  paymentsReceived: number;
   totalExpenditure: number;
   accountReceivables: number;
   accountPayables: number;
+  totalStockValue: number;
   damagedStockValue: number;
   lowStockItems: Product[];
   topCustomers: { id?: string; name: string; total: number; count: number }[];
@@ -42,7 +48,7 @@ export default function Dashboard() {
   const [activityCurrentPage, setActivityCurrentPage] = useState(1);
   const [paymentsCurrentPage, setPaymentsCurrentPage] = useState(1);
   const [expensesCurrentPage, setExpensesCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 20;
   
   // Filters
   const [dateRange, setDateRange] = useState({
@@ -53,9 +59,15 @@ export default function Dashboard() {
 
   const [stats, setStats] = useState<DashboardStats>({
     totalRevenue: 0,
+    totalSales: 0,
+    cashSales: 0,
+    creditSales: 0,
+    depositSales: 0,
+    paymentsReceived: 0,
     totalExpenditure: 0,
     accountReceivables: 0,
     accountPayables: 0,
+    totalStockValue: 0,
     damagedStockValue: 0,
     lowStockItems: [],
     topCustomers: [],
@@ -122,17 +134,18 @@ export default function Dashboard() {
 
         // 4. Fetch Debtors (Customers with debt)
         let debtorsQ = query(collection(db, 'customers'), where('totalDebt', '>', 0));
-        if (branchFilter) {
-          debtorsQ = query(debtorsQ, where('primaryBranch', '==', branchFilter));
-        }
         const debtorsSnapshot = await getDocs(debtorsQ);
-        const debtors = debtorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+        let debtors = debtorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+        
+        if (branchFilter) {
+          debtors = debtors.filter(d => d.primaryBranch === branchFilter);
+        }
 
         // 5. Fetch Creditors (Suppliers we owe)
-        // Assuming a 'creditors' collection or 'suppliers' with debt
-        const creditorsSnapshot = await getDocs(collection(db, 'creditors'));
-        const creditors = creditorsSnapshot.docs.map(doc => doc.data());
-        const totalPayables = creditors.reduce((acc, curr: any) => acc + (curr.amountOwed || 0), 0);
+        // Fetch Suppliers for Payables
+        const suppliersSnapshot = await getDocs(collection(db, 'suppliers'));
+        const suppliers = suppliersSnapshot.docs.map(doc => doc.data() as Supplier);
+        const totalPayables = suppliers.reduce((acc, curr) => acc + (curr.totalPayable || 0), 0);
 
         // 6. Fetch Damaged Stock
         let damagedQ = query(collection(db, 'damaged_stock'));
@@ -151,12 +164,48 @@ export default function Dashboard() {
         const inventorySnapshot = await getDocs(inventoryQ);
         const inventory = inventorySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
         const lowStockItems = inventory.filter(p => p.stockLevel <= p.minStockLevel);
+        const totalStockValue = inventory.reduce((acc, p) => acc + ((p.costPrice || p.price || 0) * (p.stockLevel || 0)), 0);
+
+        // 8. Fetch Payments (Receivables collected)
+        const paymentsQ = query(
+          collection(db, 'payments'),
+          where('date', '>=', Timestamp.fromDate(start)),
+          where('date', '<=', Timestamp.fromDate(end))
+        );
+        const paymentsSnapshot = await getDocs(paymentsQ);
+        let payments = paymentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+        
+        if (branchFilter) {
+          payments = payments.filter(p => p.branchId === branchFilter);
+        }
+        
+        const totalPaymentsReceived = payments.reduce((acc, p) => acc + (p.amount || 0), 0);
 
         // Aggregations
-        const totalRevenue = transactions.reduce((acc, t) => acc + (t.totalAmount || 0), 0);
+        let totalSales = 0;
+        let cashSales = 0;
+        let creditSales = 0;
+        let depositSales = 0;
+
+        transactions.forEach(t => {
+          const amount = t.totalAmount || 0;
+          if (t.type === 'Cash Sale') {
+            cashSales += amount;
+            totalSales += amount;
+          } else if (t.type === 'Credit Sale') {
+            creditSales += amount;
+            totalSales += amount;
+          } else if (t.type === 'Deposit') {
+            depositSales += amount;
+            totalSales += amount;
+          }
+        });
+
         const totalExp = expenses.reduce((acc, e) => acc + (e.amount || 0), 0) + 
                          payroll.reduce((acc, p) => acc + (p.netSalary || 0), 0);
         const totalReceivables = debtors.reduce((acc, d) => acc + (d.totalDebt || 0), 0);
+        // Total Revenue is now reflecting income actually received: Cash Sales + Deposits + Payments (Receivables collected)
+        const totalRevenue = cashSales + depositSales + totalPaymentsReceived;
 
         // Top Customers
         const customerMap = new Map<string, { id?: string; name: string; total: number; count: number }>();
@@ -197,9 +246,15 @@ export default function Dashboard() {
 
         setStats({
           totalRevenue,
+          totalSales,
+          cashSales,
+          creditSales,
+          depositSales,
+          paymentsReceived: totalPaymentsReceived,
           totalExpenditure: totalExp,
           accountReceivables: totalReceivables,
           accountPayables: totalPayables,
+          totalStockValue,
           damagedStockValue: totalDamagedValue,
           lowStockItems,
           topCustomers,
@@ -389,13 +444,48 @@ export default function Dashboard() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
       >
+        {/* Total Sales Card */}
+        <motion.div
+          variants={cardVariants}
+          whileHover="hover"
+          whileTap="tap"
+          className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group cursor-default sm:row-span-2 flex flex-col"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 bg-blue-50 rounded-full opacity-50 group-hover:scale-110 transition-transform" />
+          <div className="relative z-10 flex-1 flex flex-col">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 bg-blue-100 rounded-xl">
+                <ShoppingCart className="text-blue-600" size={20} />
+              </div>
+            </div>
+            <p className="text-sm text-gray-500 font-medium">Total Sales</p>
+            <h3 className="text-2xl font-bold text-gray-900 mt-1 mb-6">{formatCurrency(stats.totalSales)}</h3>
+            
+            <div className="mt-auto space-y-4">
+              <div className="flex justify-between items-center text-sm border-t border-gray-50 pt-3">
+                <span className="text-gray-500 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-400"></div>Cash</span>
+                <span className="font-medium text-gray-900">{formatCurrency(stats.cashSales)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm border-t border-gray-50 pt-3">
+                <span className="text-gray-500 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-400"></div>Credit</span>
+                <span className="font-medium text-gray-900">{formatCurrency(stats.creditSales)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm border-t border-gray-50 pt-3">
+                <span className="text-gray-500 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-amber-400"></div>Deposit</span>
+                <span className="font-medium text-gray-900">{formatCurrency(stats.depositSales)}</span>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
         {[
           { label: 'Total Revenue', value: stats.totalRevenue, icon: TrendingUp, color: 'emerald', trend: '+12.5%' },
           { label: 'Total Expenditure', value: stats.totalExpenditure, icon: TrendingDown, color: 'rose', trend: '+4.2%' },
-          { label: 'Receivables', value: stats.accountReceivables, icon: CreditCard, color: 'blue', trend: '-2.1%' },
-          { label: 'Payables', value: stats.accountPayables, icon: CreditCard, color: 'orange', trend: '+1.5%' },
+          { label: 'Total Stock Value', value: stats.totalStockValue, icon: Package, color: 'blue', trend: '0.0%' },
+          { label: 'Receivables', value: stats.accountReceivables, icon: ArrowDownRight, color: 'indigo', trend: '-2.1%' },
+          { label: 'Payables', value: stats.accountPayables, icon: ArrowUpRight, color: 'orange', trend: '+1.5%' },
           { label: 'Damaged Stock', value: stats.damagedStockValue, icon: AlertTriangle, color: 'amber', trend: '0.0%' },
         ].map((item, idx) => (
           <motion.div

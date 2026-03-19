@@ -28,6 +28,8 @@ import PayrollList from '@/pages/Payroll/PayrollList';
 import FinancialStatements from '@/pages/Financials/FinancialStatements';
 import PaymentsList from '@/pages/Financials/PaymentsList';
 import PaymentDetails from '@/pages/Financials/PaymentDetails';
+import FixedAssets from '@/pages/Financials/FixedAssets';
+import PaymentsBySource from '@/pages/Financials/PaymentsBySource';
 import AuditLogsList from '@/pages/AuditLogs/AuditLogsList';
 import BranchesList from '@/pages/Branches/BranchesList';
 import BranchDetails from '@/pages/Branches/BranchDetails';
@@ -180,6 +182,8 @@ const AppRoutes = () => {
       <Route element={<ProtectedRoute allowedRoles={['Accountant', 'Director', 'Admin']} />}>
         <Route element={<Layout><PayrollList /></Layout>} path="/payroll" />
         <Route element={<Layout><FinancialStatements /></Layout>} path="/financials" />
+        <Route element={<Layout><FixedAssets /></Layout>} path="/fixed-assets" />
+        <Route element={<Layout><PaymentsBySource /></Layout>} path="/payments-by-source" />
         <Route element={<Layout><AuditLogsList /></Layout>} path="/audit-logs" />
       </Route>
 

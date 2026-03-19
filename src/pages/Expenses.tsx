@@ -28,7 +28,7 @@ export default function Expenses() {
   const [dateFilter, setDateFilter] = useState<'ALL' | 'WEEK' | 'MONTH' | 'QUARTER' | 'YEAR'>('ALL');
   const [selectedBranch, setSelectedBranch] = useState<Branch | 'ALL'>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 25;
+  const itemsPerPage = 20;
 
   useEffect(() => {
     if (!userProfile) return;

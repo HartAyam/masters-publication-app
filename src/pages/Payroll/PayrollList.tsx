@@ -19,7 +19,7 @@ export default function PayrollList() {
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollRecord | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 25;
+  const itemsPerPage = 20;
   
   // Filters
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -62,22 +62,24 @@ export default function PayrollList() {
     try {
       let q = query(collection(db, 'payroll'), orderBy('month', 'desc'));
 
+      const snapshot = await getDocs(q);
+      let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PayrollRecord));
+      
+      // Filter in memory
       if (selectedMonth) {
-        q = query(q, where('month', '==', selectedMonth));
+        data = data.filter(p => p.month === selectedMonth);
       }
       
       if (!isGlobalUser(userProfile.role)) {
-        q = query(q, where('branchId', '==', userProfile.branchId));
+        data = data.filter(p => p.branchId === userProfile.branchId);
       } else if (selectedBranch !== 'ALL') {
-        q = query(q, where('branchId', '==', selectedBranch));
+        data = data.filter(p => p.branchId === selectedBranch);
       }
 
       if (selectedStatus !== 'ALL') {
-        q = query(q, where('status', '==', selectedStatus));
+        data = data.filter(p => p.status === selectedStatus);
       }
 
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PayrollRecord));
       setPayrolls(data);
     } catch (error) {
       console.error("Error fetching payrolls:", error);

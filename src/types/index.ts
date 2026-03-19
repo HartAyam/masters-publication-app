@@ -19,8 +19,10 @@ export interface Product {
   name: string;
   sku: string;
   price: number;
+  costPrice: number;
   stockLevel: number;
   minStockLevel: number;
+  damagedStock: number;
   branchId: Branch;
   category: string;
 }
@@ -56,7 +58,9 @@ export interface Customer {
   createdAt: any;
 }
 
-export interface Transaction {
+export type Transaction = Order;
+
+export interface Order {
   id: string;
   type: 'Cash Sale' | 'Credit Sale' | 'Deposit' | 'Stock Return' | 'Supply Note';
   items: SaleItem[];
@@ -93,10 +97,13 @@ export interface Payment {
   receivedBy: string;
   receivedById: string;
   date: any;
+  createdAt: any; // Adding for consistency
   paymentMethod: 'Bank' | 'MoMo' | 'Cash';
   accountNumber?: string;
   branchId: Branch;
   notes?: string;
+  orderId?: string; // Adding to link to orders
+  reference?: string; // Adding for payment reference
 }
 
 export interface Supplier {
@@ -107,6 +114,7 @@ export interface Supplier {
   email?: string;
   address?: string;
   contactPerson?: ContactPerson;
+  totalPayable: number;
   primaryBranch: Branch;
   createdAt: any;
 }
@@ -159,6 +167,19 @@ export interface FinancialReport {
   generatedAt: any;
   generatedBy: string;
   data: any;
+}
+
+export interface FixedAsset {
+  id: string;
+  name: string;
+  category: string;
+  purchaseDate: any;
+  purchasePrice: number;
+  currentValue: number;
+  depreciationRate: number; // Annual percentage
+  branchId: Branch;
+  description?: string;
+  createdAt: any;
 }
 
 export interface BranchModel {

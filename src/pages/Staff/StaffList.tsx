@@ -19,7 +19,7 @@ export default function StaffList() {
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 25;
+  const itemsPerPage = 20;
 
   // Form State
   const [email, setEmail] = useState('');

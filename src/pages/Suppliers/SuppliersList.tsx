@@ -22,7 +22,7 @@ export default function SuppliersList() {
   const [selectedType, setSelectedType] = useState<ClientType | 'ALL'>('ALL');
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 25;
+  const itemsPerPage = 20;
 
   // Form State
   const [name, setName] = useState('');

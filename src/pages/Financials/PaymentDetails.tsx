@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { Payment, Customer, BranchModel } from '@/types';
 import { 
   ArrowLeft, 
@@ -14,13 +14,13 @@ import {
   CheckCircle2,
   Clock,
   Building,
-  Phone
+  Phone,
+  ShoppingCart
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { printDiv } from '@/lib/exportUtils';
 import { formatCurrency } from '@/lib/idUtils';
-import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default function PaymentDetails() {
   const { id } = useParams();
@@ -29,6 +29,7 @@ export default function PaymentDetails() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [branch, setBranch] = useState<BranchModel | null>(null);
   const [loading, setLoading] = useState(true);
+  const [paymentTypeTotal, setPaymentTypeTotal] = useState(0);
 
   useEffect(() => {
     if (id) {
@@ -59,6 +60,23 @@ export default function PaymentDetails() {
         if (!branchSnapshot.empty) {
           setBranch({ id: branchSnapshot.docs[0].id, ...branchSnapshot.docs[0].data() as any } as BranchModel);
         }
+
+        // Fetch total for this payment type today
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        const end = new Date();
+        end.setHours(23, 59, 59, 999);
+
+        const paymentsQ = query(
+          collection(db, 'payments'), 
+          where('date', '>=', Timestamp.fromDate(start)),
+          where('date', '<=', Timestamp.fromDate(end))
+        );
+        const paymentsSnapshot = await getDocs(paymentsQ);
+        const total = paymentsSnapshot.docs
+          .filter(doc => doc.data().paymentMethod === paymentData.paymentMethod)
+          .reduce((sum, doc) => sum + (doc.data().amount || 0), 0);
+        setPaymentTypeTotal(total);
       } else {
         console.log("No such document!");
       }
@@ -91,14 +109,30 @@ export default function PaymentDetails() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <button 
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-        >
-          <ArrowLeft size={20} />
-          Back
-        </button>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft size={20} />
+            Back
+          </button>
+          <div className="h-8 w-px bg-gray-200" />
+          <div className="flex flex-col">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Daily {payment.paymentMethod} Total</p>
+            <p className="text-sm font-bold text-blue-600">{formatCurrency(paymentTypeTotal)}</p>
+          </div>
+        </div>
         <div className="flex gap-3">
+          {payment.orderId && (
+            <button 
+              onClick={() => navigate(`/orders/${payment.orderId}`)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              <ShoppingCart size={18} />
+              View Order
+            </button>
+          )}
           <button 
             onClick={() => printDiv('payment-receipt', `Receipt_${payment.id}`)}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"

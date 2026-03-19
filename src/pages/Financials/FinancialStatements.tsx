@@ -1,21 +1,24 @@
 import React, { useState } from 'react';
-import { FileText, Download, Printer } from 'lucide-react';
+import { FileText, Download, Printer, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
 import { startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subMonths, subYears, format, startOfWeek, endOfWeek } from 'date-fns';
-import { Transaction, Expense, Payment, Product } from '@/types';
+import { Transaction, Expense, Payment, Product, FixedAsset, Supplier, Branch } from '@/types';
+import { exportToCSV, printDiv } from '@/lib/exportUtils';
 
-import { isGlobalUser } from '@/lib/utils';
+import { isGlobalUser, BRANCHES } from '@/lib/utils';
 
 export default function FinancialStatements() {
   const { userProfile } = useAuth();
   const [reportType, setReportType] = useState('Income Statement');
   const [period, setPeriod] = useState('This Month');
+  const [selectedBranch, setSelectedBranch] = useState<Branch | 'All'>(userProfile?.branchId || 'All');
   const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
   const [generating, setGenerating] = useState(false);
   const [reportData, setReportData] = useState<any>(null);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
 
   const getDateRange = () => {
     if (period === 'Custom Interval') {
@@ -52,59 +55,87 @@ export default function FinancialStatements() {
       const endTimestamp = Timestamp.fromDate(end);
 
       // Fetch Transactions
-      let txQuery = query(
+      const txQuery = query(
         collection(db, 'transactions'),
         where('date', '>=', startTimestamp),
         where('date', '<=', endTimestamp)
       );
-      if (userProfile && !isGlobalUser(userProfile.role)) {
-        txQuery = query(txQuery, where('branchId', '==', userProfile.branchId));
-      }
       const txSnap = await getDocs(txQuery);
-      const transactions = txSnap.docs.map(doc => doc.data() as Transaction);
+      let transactions = txSnap.docs.map(doc => doc.data() as Transaction);
+      
+      // Filter by branch in memory to avoid composite index requirement
+      if (selectedBranch !== 'All') {
+        transactions = transactions.filter(tx => tx.branchId === selectedBranch);
+      } else if (userProfile && !isGlobalUser(userProfile.role)) {
+        transactions = transactions.filter(tx => tx.branchId === userProfile.branchId);
+      }
 
       // Fetch Expenses
-      let expQuery = query(
+      const expQuery = query(
         collection(db, 'expenses'),
         where('date', '>=', startTimestamp),
         where('date', '<=', endTimestamp)
       );
-      if (userProfile && !isGlobalUser(userProfile.role)) {
-        expQuery = query(expQuery, where('branchId', '==', userProfile.branchId));
-      }
       const expSnap = await getDocs(expQuery);
-      const expenses = expSnap.docs.map(doc => doc.data() as Expense);
+      let expenses = expSnap.docs.map(doc => doc.data() as Expense);
+
+      if (selectedBranch !== 'All') {
+        expenses = expenses.filter(exp => exp.branchId === selectedBranch);
+      } else if (userProfile && !isGlobalUser(userProfile.role)) {
+        expenses = expenses.filter(exp => exp.branchId === userProfile.branchId);
+      }
 
       // Fetch Payments
-      let payQuery = query(
+      const payQuery = query(
         collection(db, 'payments'),
         where('date', '>=', startTimestamp),
         where('date', '<=', endTimestamp)
       );
-      if (userProfile && !isGlobalUser(userProfile.role)) {
-        payQuery = query(payQuery, where('branchId', '==', userProfile.branchId));
-      }
       const paySnap = await getDocs(payQuery);
-      const payments = paySnap.docs.map(doc => doc.data() as Payment);
+      let payments = paySnap.docs.map(doc => doc.data() as Payment);
+
+      if (selectedBranch !== 'All') {
+        payments = payments.filter(pay => pay.branchId === selectedBranch);
+      } else if (userProfile && !isGlobalUser(userProfile.role)) {
+        payments = payments.filter(pay => pay.branchId === userProfile.branchId);
+      }
 
       // Fetch Products for Inventory Value
       let prodQuery = query(collection(db, 'products'));
-      if (userProfile && !isGlobalUser(userProfile.role)) {
-        prodQuery = query(prodQuery, where('branchId', '==', userProfile.branchId));
+      if (selectedBranch !== 'All') {
+        prodQuery = query(prodQuery, where('branchId', '==', selectedBranch));
       }
       const prodSnap = await getDocs(prodQuery);
       const products = prodSnap.docs.map(doc => doc.data() as Product);
+
+      // Fetch Fixed Assets
+      let assetQuery = query(collection(db, 'fixed_assets'));
+      if (selectedBranch !== 'All') {
+        assetQuery = query(assetQuery, where('branchId', '==', selectedBranch));
+      }
+      const assetSnap = await getDocs(assetQuery);
+      const fixedAssets = assetSnap.docs.map(doc => doc.data() as FixedAsset);
+
+      // Fetch Suppliers for Accounts Payable
+      let supplierQuery = query(collection(db, 'suppliers'));
+      if (selectedBranch !== 'All') {
+        supplierQuery = query(supplierQuery, where('primaryBranch', '==', selectedBranch));
+      }
+      const supplierSnap = await getDocs(supplierQuery);
+      const suppliers = supplierSnap.docs.map(doc => doc.data() as Supplier);
 
       // Process Data
       let totalRevenue = 0;
       let totalCashSales = 0;
       let totalCreditSales = 0;
+      let totalDepositSales = 0;
       
       transactions.forEach(tx => {
-        if (tx.type === 'Cash Sale' || tx.type === 'Credit Sale') {
+        if (tx.type === 'Cash Sale' || tx.type === 'Credit Sale' || tx.type === 'Deposit') {
           totalRevenue += tx.totalAmount;
           if (tx.type === 'Cash Sale') totalCashSales += tx.totalAmount;
           if (tx.type === 'Credit Sale') totalCreditSales += tx.totalAmount;
+          if (tx.type === 'Deposit') totalDepositSales += tx.totalAmount;
         }
       });
 
@@ -125,10 +156,22 @@ export default function FinancialStatements() {
         inventoryValue += (prod.price * prod.stockLevel); // Using selling price as proxy if cost price isn't available
       });
 
+      let totalFixedAssets = 0;
+      fixedAssets.forEach(asset => {
+        totalFixedAssets += asset.currentValue;
+      });
+
+      let totalAccountsPayable = 0;
+      suppliers.forEach(supplier => {
+        totalAccountsPayable += (supplier.totalPayable || 0);
+      });
+
       const netIncome = totalRevenue - totalExpenses;
 
       setReportData({
         periodLabel: `${format(start, 'MMM dd, yyyy')} - ${format(end, 'MMM dd, yyyy')}`,
+        endDateLabel: format(end, 'MMM dd, yyyy'),
+        branchLabel: selectedBranch === 'All' ? 'All Branches' : selectedBranch,
         totalRevenue,
         totalCashSales,
         totalCreditSales,
@@ -136,8 +179,10 @@ export default function FinancialStatements() {
         expensesByCategory,
         totalPaymentsReceived,
         inventoryValue,
+        totalFixedAssets,
+        totalAccountsPayable,
         netIncome,
-        cashOnHand: totalCashSales + totalPaymentsReceived - totalExpenses,
+        cashOnHand: totalCashSales + totalDepositSales + totalPaymentsReceived - totalExpenses,
         accountsReceivable: totalCreditSales - totalPaymentsReceived
       });
 
@@ -154,7 +199,64 @@ export default function FinancialStatements() {
   };
 
   const printReport = () => {
-    window.print();
+    console.log('Printing report:', reportType);
+    printDiv('printable-report', `${reportType} - ${reportData?.branchLabel}`);
+  };
+
+  const downloadCSV = () => {
+    console.log('Downloading CSV:', reportType);
+    if (!reportData) {
+      console.error('No report data available for CSV download');
+      return;
+    }
+    
+    let csvData: any[] = [];
+    if (reportType === 'Income Statement') {
+      csvData = [
+        { Category: 'Revenue', Item: 'Cash Sales', Amount: reportData.totalCashSales },
+        { Category: 'Revenue', Item: 'Credit Sales', Amount: reportData.totalCreditSales },
+        { Category: 'Revenue', Item: 'Total Revenue', Amount: reportData.totalRevenue },
+        ...Object.entries(reportData.expensesByCategory).map(([cat, amt]) => ({
+          Category: 'Expense', Item: cat, Amount: amt
+        })),
+        { Category: 'Expense', Item: 'Total Expenses', Amount: reportData.totalExpenses },
+        { Category: 'Summary', Item: 'Net Income', Amount: reportData.netIncome }
+      ];
+    } else if (reportType === 'Balance Sheet') {
+      csvData = [
+        { Category: 'Assets', Item: 'Cash on Hand', Amount: reportData.cashOnHand },
+        { Category: 'Assets', Item: 'Accounts Receivable', Amount: reportData.accountsReceivable },
+        { Category: 'Assets', Item: 'Inventory Value', Amount: reportData.inventoryValue },
+        { Category: 'Assets', Item: 'Fixed Assets', Amount: reportData.totalFixedAssets },
+        { Category: 'Liabilities', Item: 'Accounts Payable', Amount: reportData.totalAccountsPayable }
+      ];
+    } else if (reportType === 'Cash Flow Statement') {
+      csvData = [
+        { Category: 'Inflow', Item: 'Cash Sales', Amount: reportData.totalCashSales },
+        { Category: 'Inflow', Item: 'Payments Received (AR)', Amount: reportData.totalPaymentsReceived },
+        { Category: 'Inflow', Item: 'Total Inflow', Amount: reportData.totalCashSales + reportData.totalPaymentsReceived },
+        { Category: 'Outflow', Item: 'Operating Expenses', Amount: reportData.totalExpenses },
+        { Category: 'Outflow', Item: 'Total Outflow', Amount: reportData.totalExpenses },
+        { Category: 'Summary', Item: 'Net Cash Flow', Amount: reportData.cashOnHand }
+      ];
+    } else if (reportType === 'Trial Balance') {
+      csvData = [
+        { Account: 'Cash', Debit: reportData.cashOnHand > 0 ? reportData.cashOnHand : 0, Credit: reportData.cashOnHand < 0 ? Math.abs(reportData.cashOnHand) : 0 },
+        { Account: 'Accounts Receivable', Debit: reportData.accountsReceivable > 0 ? reportData.accountsReceivable : 0, Credit: reportData.accountsReceivable < 0 ? Math.abs(reportData.accountsReceivable) : 0 },
+        { Account: 'Inventory', Debit: reportData.inventoryValue, Credit: 0 },
+        { Account: 'Sales Revenue', Debit: 0, Credit: reportData.totalRevenue },
+        { Account: 'Expenses', Debit: reportData.totalExpenses, Credit: 0 }
+      ];
+    }
+
+    exportToCSV(csvData, `${reportType}_${reportData.branchLabel}_${reportData.endDateLabel}`);
+    setShowDownloadMenu(false);
+  };
+
+  const downloadPDF = () => {
+    console.log('Downloading PDF (via print):', reportType);
+    printDiv('printable-report', `${reportType} - ${reportData?.branchLabel}`);
+    setShowDownloadMenu(false);
   };
 
   return (
@@ -179,6 +281,20 @@ export default function FinancialStatements() {
                 <option>Balance Sheet</option>
                 <option>Cash Flow Statement</option>
                 <option>Trial Balance</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Branch</label>
+              <select
+                className="w-full p-2 border border-gray-200 rounded-lg"
+                value={selectedBranch}
+                onChange={(e) => setSelectedBranch(e.target.value as Branch | 'All')}
+                disabled={!isGlobalUser(userProfile?.role || '')}
+              >
+                <option value="All">All Branches</option>
+                {BRANCHES.map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -249,17 +365,53 @@ export default function FinancialStatements() {
             </div>
           ) : (
             <div className="flex-1" id="printable-report">
-              <div className="flex justify-between items-start mb-8">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">{reportType}</h2>
-                  <p className="text-gray-500">{reportData.periodLabel}</p>
+              <div className="text-center mb-8 border-b pb-6">
+                <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tighter mb-1">Masters Publication</h1>
+                <p className="text-lg font-bold text-blue-600 uppercase tracking-widest mb-1">{reportData.branchLabel}</p>
+                <h2 className="text-xl font-semibold text-gray-800 mb-1">{reportType}</h2>
+                <p className="text-gray-500 font-medium">as of {reportData.endDateLabel}</p>
+              </div>
+
+              <div className="flex justify-end gap-2 mb-6 print:hidden">
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    <Download size={18} />
+                    Download
+                    <ChevronDown size={16} className={`transition-transform ${showDownloadMenu ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {showDownloadMenu && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-10" 
+                        onClick={() => setShowDownloadMenu(false)}
+                      />
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-20">
+                        <button 
+                          onClick={downloadCSV}
+                          className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm flex items-center gap-2"
+                        >
+                          Download as CSV
+                        </button>
+                        <button 
+                          onClick={downloadPDF}
+                          className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm flex items-center gap-2"
+                        >
+                          Download as PDF
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <button 
                   onClick={printReport}
-                  className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors print:hidden"
-                  title="Print Report"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  <Printer size={20} />
+                  <Printer size={18} />
+                  Print
                 </button>
               </div>
 
@@ -323,9 +475,25 @@ export default function FinancialStatements() {
                       <span className="text-gray-600">Inventory Value (Est.)</span>
                       <span className="font-medium">{formatCurrency(reportData.inventoryValue)}</span>
                     </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-gray-600">Fixed Assets</span>
+                      <span className="font-medium">{formatCurrency(reportData.totalFixedAssets)}</span>
+                    </div>
                     <div className="flex justify-between py-2 mt-2 border-t font-bold text-gray-900">
                       <span>Total Assets</span>
-                      <span>{formatCurrency(reportData.cashOnHand + reportData.accountsReceivable + reportData.inventoryValue)}</span>
+                      <span>{formatCurrency(reportData.cashOnHand + reportData.accountsReceivable + reportData.inventoryValue + reportData.totalFixedAssets)}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 border-b pb-2 mb-3">Liabilities</h3>
+                    <div className="flex justify-between py-1">
+                      <span className="text-gray-600">Accounts Payable</span>
+                      <span className="font-medium">{formatCurrency(reportData.totalAccountsPayable)}</span>
+                    </div>
+                    <div className="flex justify-between py-2 mt-2 border-t font-bold text-gray-900">
+                      <span>Total Liabilities</span>
+                      <span>{formatCurrency(reportData.totalAccountsPayable)}</span>
                     </div>
                   </div>
                   <div className="text-sm text-gray-500 italic mt-8">
@@ -375,42 +543,44 @@ export default function FinancialStatements() {
 
               {reportType === 'Trial Balance' && (
                 <div className="space-y-6">
-                  <table className="w-full text-left">
-                    <thead className="border-b-2 border-gray-900">
-                      <tr>
-                        <th className="py-2 font-semibold">Account</th>
-                        <th className="py-2 font-semibold text-right">Debit</th>
-                        <th className="py-2 font-semibold text-right">Credit</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      <tr>
-                        <td className="py-2">Cash</td>
-                        <td className="py-2 text-right">{reportData.cashOnHand > 0 ? formatCurrency(reportData.cashOnHand) : '-'}</td>
-                        <td className="py-2 text-right">{reportData.cashOnHand < 0 ? formatCurrency(Math.abs(reportData.cashOnHand)) : '-'}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-2">Accounts Receivable</td>
-                        <td className="py-2 text-right">{reportData.accountsReceivable > 0 ? formatCurrency(reportData.accountsReceivable) : '-'}</td>
-                        <td className="py-2 text-right">{reportData.accountsReceivable < 0 ? formatCurrency(Math.abs(reportData.accountsReceivable)) : '-'}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-2">Inventory</td>
-                        <td className="py-2 text-right">{formatCurrency(reportData.inventoryValue)}</td>
-                        <td className="py-2 text-right">-</td>
-                      </tr>
-                      <tr>
-                        <td className="py-2">Sales Revenue</td>
-                        <td className="py-2 text-right">-</td>
-                        <td className="py-2 text-right">{formatCurrency(reportData.totalRevenue)}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-2">Expenses</td>
-                        <td className="py-2 text-right">{formatCurrency(reportData.totalExpenses)}</td>
-                        <td className="py-2 text-right">-</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left min-w-[500px]">
+                      <thead className="border-b-2 border-gray-900">
+                        <tr>
+                          <th className="py-2 font-semibold whitespace-nowrap">Account</th>
+                          <th className="py-2 font-semibold text-right whitespace-nowrap">Debit</th>
+                          <th className="py-2 font-semibold text-right whitespace-nowrap">Credit</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        <tr>
+                          <td className="py-2 whitespace-nowrap">Cash</td>
+                          <td className="py-2 text-right whitespace-nowrap">{reportData.cashOnHand > 0 ? formatCurrency(reportData.cashOnHand) : '-'}</td>
+                          <td className="py-2 text-right whitespace-nowrap">{reportData.cashOnHand < 0 ? formatCurrency(Math.abs(reportData.cashOnHand)) : '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="py-2 whitespace-nowrap">Accounts Receivable</td>
+                          <td className="py-2 text-right whitespace-nowrap">{reportData.accountsReceivable > 0 ? formatCurrency(reportData.accountsReceivable) : '-'}</td>
+                          <td className="py-2 text-right whitespace-nowrap">{reportData.accountsReceivable < 0 ? formatCurrency(Math.abs(reportData.accountsReceivable)) : '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="py-2 whitespace-nowrap">Inventory</td>
+                          <td className="py-2 text-right whitespace-nowrap">{formatCurrency(reportData.inventoryValue)}</td>
+                          <td className="py-2 text-right whitespace-nowrap">-</td>
+                        </tr>
+                        <tr>
+                          <td className="py-2 whitespace-nowrap">Sales Revenue</td>
+                          <td className="py-2 text-right whitespace-nowrap">-</td>
+                          <td className="py-2 text-right whitespace-nowrap">{formatCurrency(reportData.totalRevenue)}</td>
+                        </tr>
+                        <tr>
+                          <td className="py-2 whitespace-nowrap">Expenses</td>
+                          <td className="py-2 text-right whitespace-nowrap">{formatCurrency(reportData.totalExpenses)}</td>
+                          <td className="py-2 text-right whitespace-nowrap">-</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>

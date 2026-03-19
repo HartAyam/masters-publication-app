@@ -19,18 +19,20 @@ export default function Inventory() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 25;
+  const itemsPerPage = 20;
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBranch, setSelectedBranch] = useState<Branch | 'ALL'>('ALL');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [viewTab, setViewTab] = useState<'ALL' | 'LOW' | 'DAMAGED'>('ALL');
 
   // Form State
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
   const [category, setCategory] = useState('General');
   const [price, setPrice] = useState('');
+  const [costPrice, setCostPrice] = useState('');
   const [stockLevel, setStockLevel] = useState('');
   const [minStockLevel, setMinStockLevel] = useState('10');
   const [branchId, setBranchId] = useState<Branch>(BRANCHES[0] as Branch);
@@ -46,7 +48,12 @@ export default function Inventory() {
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+      const productsData = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        damagedStock: 0, // Default for existing data
+        costPrice: 0, // Default for existing data
+        ...doc.data() 
+      } as Product));
       setProducts(productsData);
     });
 
@@ -63,8 +70,10 @@ export default function Inventory() {
         sku,
         category,
         price: parseFloat(price),
+        costPrice: parseFloat(costPrice),
         stockLevel: parseInt(stockLevel),
         minStockLevel: parseInt(minStockLevel),
+        damagedStock: 0,
         branchId: isGlobalUser(userProfile?.role) ? branchId : userProfile?.branchId,
       });
 
@@ -72,6 +81,7 @@ export default function Inventory() {
       setName('');
       setSku('');
       setPrice('');
+      setCostPrice('');
       setStockLevel('');
 
       // Log activity
@@ -105,6 +115,7 @@ export default function Inventory() {
       Price: p.price,
       Stock: p.stockLevel,
       'Min Stock': p.minStockLevel,
+      'Damaged Stock': p.damagedStock || 0,
       Branch: p.branchId
     }));
     exportToCSV(dataToExport, `Inventory_${format(new Date(), 'yyyy-MM-dd')}`);
@@ -115,8 +126,15 @@ export default function Inventory() {
       product.sku.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesBranch = selectedBranch === 'ALL' || product.branchId === selectedBranch;
     const matchesCategory = selectedCategory === 'ALL' || product.category === selectedCategory;
+    
+    let matchesTab = true;
+    if (viewTab === 'LOW') {
+      matchesTab = product.stockLevel <= product.minStockLevel;
+    } else if (viewTab === 'DAMAGED') {
+      matchesTab = (product.damagedStock || 0) > 0;
+    }
 
-    return matchesSearch && matchesBranch && matchesCategory;
+    return matchesSearch && matchesBranch && matchesCategory && matchesTab;
   });
 
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
@@ -162,6 +180,46 @@ export default function Inventory() {
             Add New
           </button>
         </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-4 mb-6 border-b border-gray-200">
+        <button
+          onClick={() => { setViewTab('ALL'); setCurrentPage(1); }}
+          className={cn(
+            "pb-2 px-4 text-sm font-medium transition-colors relative",
+            viewTab === 'ALL' ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
+          )}
+        >
+          All Inventory
+          {viewTab === 'ALL' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />}
+        </button>
+        <button
+          onClick={() => { setViewTab('LOW'); setCurrentPage(1); }}
+          className={cn(
+            "pb-2 px-4 text-sm font-medium transition-colors relative flex items-center gap-2",
+            viewTab === 'LOW' ? "text-red-600" : "text-gray-500 hover:text-gray-700"
+          )}
+        >
+          Low Stock
+          <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full text-[10px]">
+            {products.filter(p => p.stockLevel <= p.minStockLevel).length}
+          </span>
+          {viewTab === 'LOW' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-600" />}
+        </button>
+        <button
+          onClick={() => { setViewTab('DAMAGED'); setCurrentPage(1); }}
+          className={cn(
+            "pb-2 px-4 text-sm font-medium transition-colors relative flex items-center gap-2",
+            viewTab === 'DAMAGED' ? "text-orange-600" : "text-gray-500 hover:text-gray-700"
+          )}
+        >
+          Damaged Stock
+          <span className="bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full text-[10px]">
+            {products.filter(p => (p.damagedStock || 0) > 0).length}
+          </span>
+          {viewTab === 'DAMAGED' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-600" />}
+        </button>
       </div>
 
       {/* Search & Filters */}
@@ -237,12 +295,21 @@ export default function Inventory() {
             />
             <input
               type="number"
-              placeholder="Price (GHS)"
+              placeholder="Selling Price (GHS)"
               required
               step="0.01"
               className="p-2 border border-gray-200 rounded-lg"
               value={price}
               onChange={e => setPrice(e.target.value)}
+            />
+            <input
+              type="number"
+              placeholder="Cost Price (GHS)"
+              required
+              step="0.01"
+              className="p-2 border border-gray-200 rounded-lg"
+              value={costPrice}
+              onChange={e => setCostPrice(e.target.value)}
             />
             <input
               type="number"
@@ -308,6 +375,7 @@ export default function Inventory() {
                   <th className="p-4 font-medium text-gray-600">Category</th>
                   <th className="p-4 font-medium text-gray-600">Branch</th>
                   <th className="p-4 font-medium text-gray-600">Stock</th>
+                  <th className="p-4 font-medium text-gray-600">Damaged</th>
                   <th className="p-4 font-medium text-gray-600">Price</th>
                   <th className="p-4 font-medium text-gray-600">Status</th>
                 </tr>
@@ -328,6 +396,9 @@ export default function Inventory() {
                       product.stockLevel <= product.minStockLevel ? "text-red-600" : "text-gray-900"
                     )}>
                       {product.stockLevel}
+                    </td>
+                    <td className="p-4 text-orange-600 font-medium">
+                      {product.damagedStock || 0}
                     </td>
                     <td className="p-4">{formatCurrency(product.price)}</td>
                     <td className="p-4">

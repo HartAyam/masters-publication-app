@@ -26,7 +26,7 @@ export default function OrdersList() {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [showBackups, setShowBackups] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 25;
+  const itemsPerPage = 20;
 
   useEffect(() => {
     if (!userProfile) return;
