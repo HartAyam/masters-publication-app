@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, getDocs, addDoc, serverTimestamp, where } from 'firebase/firestore';
 import { UserProfile, Role, Branch } from '@/types';
 import { BRANCHES } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -42,7 +42,10 @@ export default function StaffList() {
   const fetchStaff = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'users'));
+      let q = query(collection(db, 'users'));
+      if (userProfile?.role === 'Cashier' || userProfile?.role === 'Manager') {
+        q = query(collection(db, 'users'), where('branchId', '==', userProfile.branchId));
+      }
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
       setStaff(data);
@@ -110,14 +113,19 @@ export default function StaffList() {
   );
 
   const handleExport = () => {
-    const dataToExport = filteredStaff.map(s => ({
-      Name: s.displayName || s.email,
-      Email: s.email,
-      Role: s.role,
-      Branch: s.branchId,
-      Phone: s.phone || 'N/A',
-      Salary: s.basicSalary || 0
-    }));
+    const dataToExport = filteredStaff.map(s => {
+      const data: any = {
+        Name: s.displayName || s.email,
+        Email: s.email,
+        Role: s.role,
+        Branch: s.branchId,
+        Phone: s.phone || 'N/A',
+      };
+      if (userProfile?.role !== 'Cashier') {
+        data.Salary = s.basicSalary || 0;
+      }
+      return data;
+    });
     exportToCSV(dataToExport, `Staff_${format(new Date(), 'yyyy-MM-dd')}`);
   };
 
