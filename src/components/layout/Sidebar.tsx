@@ -89,7 +89,7 @@ export const Sidebar = () => {
               <img 
                 src="/logo.png" 
                 alt="Logo" 
-                className="w-10 h-10 rounded bg-white p-1 object-contain shrink-0"
+                className="w-10 h-10 rounded p-1 object-contain shrink-0"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
