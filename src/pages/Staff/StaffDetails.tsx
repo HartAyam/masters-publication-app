@@ -283,17 +283,15 @@ export default function StaffDetails() {
                   <p className="text-lg font-medium text-gray-900">{staff.phone || 'N/A'}</p>
                 </div>
               </div>
-              {userProfile?.role !== 'Cashier' && (
-                <div className="flex items-start gap-3">
-                  <div className="bg-blue-50 p-2 rounded-lg">
-                    <DollarSign className="text-blue-600" size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Basic Salary</h3>
-                    <p className="text-lg font-medium text-gray-900">{formatCurrency(staff.basicSalary || 0)}</p>
-                  </div>
+              <div className="flex items-start gap-3">
+                <div className="bg-blue-50 p-2 rounded-lg">
+                  <DollarSign className="text-blue-600" size={24} />
                 </div>
-              )}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Basic Salary</h3>
+                  <p className="text-lg font-medium text-gray-900">{formatCurrency(staff.basicSalary || 0)}</p>
+                </div>
+              </div>
               <div className="flex items-start gap-3">
                 <div className="bg-teal-50 p-2 rounded-lg">
                   <Calendar className="text-teal-600" size={24} />
