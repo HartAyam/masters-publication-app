@@ -147,22 +147,29 @@ export default function Dashboard() {
         const suppliers = suppliersSnapshot.docs.map(doc => doc.data() as Supplier);
         const totalPayables = suppliers.reduce((acc, curr) => acc + (curr.totalPayable || 0), 0);
 
-        // 6. Fetch Damaged Stock
-        let damagedQ = query(collection(db, 'damaged_stock'));
+        // 6. Fetch Damaged Stock from stock_movements for accuracy (matching Inventory Report)
+        let movementsQ = query(collection(db, 'stock_movements'));
         if (branchFilter) {
-          damagedQ = query(damagedQ, where('branchId', '==', branchFilter));
+          movementsQ = query(movementsQ, where('branchId', '==', branchFilter));
         }
-        const damagedSnapshot = await getDocs(damagedQ);
-        const damagedStock = damagedSnapshot.docs.map(doc => doc.data());
-        const totalDamagedValue = damagedStock.reduce((acc, curr: any) => acc + (curr.value || 0), 0);
+        const movementsSnapshot = await getDocs(movementsQ);
+        const damagedMovements = movementsSnapshot.docs
+          .map(doc => doc.data())
+          .filter((m: any) => m.type === 'Damage Report');
 
-        // 7. Fetch Inventory for Restock Meter
+        // 7. Fetch Inventory for Restock Meter and Value calculation
         let inventoryQ = query(collection(db, 'products'));
         if (branchFilter) {
           inventoryQ = query(inventoryQ, where('branchId', '==', branchFilter));
         }
         const inventorySnapshot = await getDocs(inventoryQ);
         const inventory = inventorySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+        
+        const totalDamagedValue = damagedMovements.reduce((acc, m: any) => {
+          const product = inventory.find(p => p.id === m.productId);
+          return acc + ((m.quantity || 0) * (product?.costPrice || product?.price || 0));
+        }, 0);
+
         const lowStockItems = inventory.filter(p => p.stockLevel <= p.minStockLevel);
         const totalStockValue = inventory.reduce((acc, p) => acc + ((p.costPrice || p.price || 0) * (p.stockLevel || 0)), 0);
 
@@ -484,9 +491,9 @@ export default function Dashboard() {
           { label: 'Total Revenue', value: stats.totalRevenue, icon: TrendingUp, color: 'emerald', trend: '+12.5%' },
           { label: 'Total Expenditure', value: stats.totalExpenditure, icon: TrendingDown, color: 'rose', trend: '+4.2%' },
           { label: 'Total Stock Value', value: stats.totalStockValue, icon: Package, color: 'blue', trend: '0.0%' },
-          { label: 'Receivables', value: stats.accountReceivables, icon: ArrowDownRight, color: 'indigo', trend: '-2.1%' },
-          { label: 'Payables', value: stats.accountPayables, icon: ArrowUpRight, color: 'orange', trend: '+1.5%' },
-          { label: 'Damaged Stock', value: stats.damagedStockValue, icon: AlertTriangle, color: 'amber', trend: '0.0%' },
+          { label: 'Receivables (What is Owed Us)', value: stats.accountReceivables, icon: ArrowDownRight, color: 'indigo', trend: '-2.1%' },
+          { label: 'Payables (What We Owe Others)', value: stats.accountPayables, icon: ArrowUpRight, color: 'orange', trend: '+1.5%' },
+          { label: 'Damaged Stock Value', value: stats.damagedStockValue, icon: AlertTriangle, color: 'amber', trend: '0.0%' },
         ].map((item, idx) => (
           <motion.div
             key={idx}

@@ -17,11 +17,11 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
       <div 
         className={cn(
-          "bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200",
+          "bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col",
           className
         )}
       >
-        <div className="flex justify-between items-center p-4 border-b border-gray-100">
+        <div className="flex justify-between items-center p-4 border-b border-gray-100 shrink-0">
           <h2 className="text-lg font-bold text-gray-900">{title}</h2>
           <button 
             onClick={onClose}
@@ -30,7 +30,7 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
             <X size={20} />
           </button>
         </div>
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto no-scrollbar">
           {children}
         </div>
       </div>

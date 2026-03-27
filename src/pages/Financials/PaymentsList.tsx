@@ -3,6 +3,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, where, addDoc, serverTimestamp, doc, updateDoc, increment, getDoc, getDocs } from 'firebase/firestore';
 import { Payment, Branch, Customer } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import { Modal } from '@/components/common/Modal';
 import { 
   Search, 
   Plus, 
@@ -140,7 +141,7 @@ export default function PaymentsList() {
       };
 
       // 1. Create Payment Record
-      await addDoc(collection(db, 'payments'), paymentData);
+      const docRef = await addDoc(collection(db, 'payments'), paymentData);
 
       // 2. Update Customer Debt
       const customerRef = doc(db, 'customers', selectedCustomer.id);
@@ -162,7 +163,7 @@ export default function PaymentsList() {
       setAccountNumber('');
       setSelectedCustomer(null);
       setNotes('');
-      alert('Payment recorded successfully!');
+      navigate(`/payments/${docRef.id}`);
     } catch (error) {
       console.error("Error recording payment:", error);
       alert('Failed to record payment');
@@ -297,11 +298,11 @@ export default function PaymentsList() {
               <tr className="bg-gray-50 border-b border-gray-100 text-left">
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Date</th>
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Customer</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right whitespace-nowrap">Amount</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right whitespace-nowrap">Amount Paid</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right whitespace-nowrap">Previous Debt</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right whitespace-nowrap">Balance After</th>
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Method</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Received By</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Branch</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right no-print whitespace-nowrap">Action</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap text-right">Branch</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -318,7 +319,7 @@ export default function PaymentsList() {
                   <tr 
                     key={payment.id} 
                     onClick={() => navigate(`/payments/${payment.id}`)}
-                    className="hover:bg-gray-50 transition-colors group cursor-pointer"
+                    className="hover:bg-gray-50 transition-colors group cursor-pointer text-sm"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{payment.date?.toDate ? format(payment.date.toDate(), 'MMM dd, yyyy') : 'Pending...'}</div>
@@ -330,6 +331,12 @@ export default function PaymentsList() {
                     <td className="px-6 py-4 text-right whitespace-nowrap">
                       <div className="text-sm font-bold text-emerald-600">{formatCurrency(payment.amount)}</div>
                     </td>
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                      <div className="text-sm text-gray-600">{formatCurrency(payment.previousDebt || 0)}</div>
+                    </td>
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                      <div className="text-sm font-medium text-red-600">{formatCurrency(payment.newDebt || 0)}</div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={cn(
                         "px-2 py-1 rounded-full text-[10px] font-bold uppercase",
@@ -340,19 +347,8 @@ export default function PaymentsList() {
                         {payment.paymentMethod}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-600">{payment.receivedBy}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
                       <div className="text-xs text-gray-500">{payment.branchId}</div>
-                    </td>
-                    <td className="px-6 py-4 text-right no-print whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      <Link 
-                        to={`/payments/${payment.id}`}
-                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors inline-block"
-                      >
-                        <ArrowRight size={18} />
-                      </Link>
                     </td>
                   </tr>
                 ))
@@ -372,167 +368,158 @@ export default function PaymentsList() {
       </div>
 
       {/* Add Payment Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-blue-50">
-              <h2 className="font-bold text-blue-900 flex items-center gap-2">
-                <CreditCard size={20} />
-                Record Customer Payment
-              </h2>
-              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600">
-                <X size={24} />
-              </button>
+      <Modal 
+        isOpen={showAddModal} 
+        onClose={() => setShowAddModal(false)} 
+        title="Record Customer Payment"
+        className="max-w-lg"
+      >
+        <form onSubmit={handleAddPayment} className="space-y-4">
+          {/* Customer Selection */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">Select Customer</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <input 
+                type="text"
+                placeholder="Search customer..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={custSearchTerm}
+                onChange={(e) => setCustSearchTerm(e.target.value)}
+              />
             </div>
-            
-            <form onSubmit={handleAddPayment} className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
-              {/* Customer Selection */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">Select Customer</label>
+            <div className="max-h-40 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-50 no-scrollbar">
+              {customers
+                .filter(c => c.name.toLowerCase().includes(custSearchTerm.toLowerCase()))
+                .map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setSelectedCustomer(c)}
+                    className={cn(
+                      "w-full p-3 text-left text-sm hover:bg-gray-50 transition-colors flex justify-between items-center",
+                      selectedCustomer?.id === c.id ? "bg-blue-50 border-l-4 border-blue-500" : ""
+                    )}
+                  >
+                    <div>
+                      <p className="font-bold text-gray-900">{c.name}</p>
+                      <p className="text-[10px] text-gray-500">{c.phone}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-gray-400 uppercase font-semibold">Current Debt</p>
+                      <p className="text-sm font-bold text-rose-600">{formatCurrency(c.totalDebt)}</p>
+                    </div>
+                  </button>
+                ))}
+            </div>
+          </div>
+
+          {selectedCustomer && (
+            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-blue-700">Current Debt:</span>
+                <span className="text-lg font-bold text-blue-900">{formatCurrency(selectedCustomer.totalDebt)}</span>
+              </div>
+              
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-blue-600 uppercase">Amount to Pay</label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">GHS</span>
                   <input 
-                    type="text"
-                    placeholder="Search customer..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={custSearchTerm}
-                    onChange={(e) => setCustSearchTerm(e.target.value)}
+                    type="number"
+                    required
+                    min="0.01"
+                    step="0.01"
+                    max={selectedCustomer.totalDebt}
+                    className="w-full pl-12 pr-4 py-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-bold"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
                   />
-                </div>
-                <div className="max-h-40 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-50">
-                  {customers
-                    .filter(c => c.name.toLowerCase().includes(custSearchTerm.toLowerCase()))
-                    .map(c => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => setSelectedCustomer(c)}
-                        className={cn(
-                          "w-full p-3 text-left text-sm hover:bg-gray-50 transition-colors flex justify-between items-center",
-                          selectedCustomer?.id === c.id ? "bg-blue-50 border-l-4 border-blue-500" : ""
-                        )}
-                      >
-                        <div>
-                          <p className="font-bold text-gray-900">{c.name}</p>
-                          <p className="text-[10px] text-gray-500">{c.phone}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] text-gray-400 uppercase font-semibold">Current Debt</p>
-                          <p className="text-sm font-bold text-rose-600">{formatCurrency(c.totalDebt)}</p>
-                        </div>
-                      </button>
-                    ))}
                 </div>
               </div>
 
-              {selectedCustomer && (
-                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-blue-700">Current Debt:</span>
-                    <span className="text-lg font-bold text-blue-900">{formatCurrency(selectedCustomer.totalDebt)}</span>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <label className="block text-xs font-bold text-blue-600 uppercase">Amount to Pay</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">GHS</span>
-                      <input 
-                        type="number"
-                        required
-                        min="0.01"
-                        step="0.01"
-                        max={selectedCustomer.totalDebt}
-                        className="w-full pl-12 pr-4 py-3 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-bold"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-
-                  {amount && (
-                    <div className="flex justify-between items-center pt-2 border-t border-blue-200">
-                      <span className="text-sm text-blue-700">Remaining Balance:</span>
-                      <span className="text-lg font-bold text-emerald-600">
-                        {formatCurrency(selectedCustomer.totalDebt - parseFloat(amount || '0'))}
-                      </span>
-                    </div>
-                  )}
+              {amount && (
+                <div className="flex justify-between items-center pt-2 border-t border-blue-200">
+                  <span className="text-sm text-blue-700">Remaining Balance:</span>
+                  <span className="text-lg font-bold text-emerald-600">
+                    {formatCurrency(selectedCustomer.totalDebt - parseFloat(amount || '0'))}
+                  </span>
                 </div>
               )}
+            </div>
+          )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="block text-sm font-medium text-gray-700">Payment Method</label>
-                  <select 
-                    className="w-full p-2 border border-gray-200 rounded-lg"
-                    value={paymentMethod}
-                    onChange={(e: any) => setPaymentMethod(e.target.value)}
-                  >
-                    <option value="Cash">Cash</option>
-                    <option value="MoMo">MoMo</option>
-                    <option value="Bank">Bank Transfer</option>
-                  </select>
-                </div>
-                {paymentMethod !== 'Cash' && (
-                  <div className="space-y-1">
-                    <label className="block text-sm font-medium text-gray-700">Account/Reference Number</label>
-                    <input 
-                      type="text"
-                      className="w-full p-2 border border-gray-200 rounded-lg"
-                      value={accountNumber}
-                      onChange={(e) => setAccountNumber(e.target.value)}
-                      placeholder={paymentMethod === 'MoMo' ? "MoMo Number" : "Transaction ID / Acc No"}
-                    />
-                  </div>
-                )}
-                <div className="space-y-1">
-                  <label className="block text-sm font-medium text-gray-700">Date</label>
-                  <input 
-                    type="text"
-                    disabled
-                    className="w-full p-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500"
-                    value={format(new Date(), 'MMM dd, yyyy')}
-                  />
-                </div>
-              </div>
-
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">Payment Method</label>
+              <select 
+                className="w-full p-2 border border-gray-200 rounded-lg"
+                value={paymentMethod}
+                onChange={(e: any) => setPaymentMethod(e.target.value)}
+              >
+                <option value="Cash">Cash</option>
+                <option value="MoMo">MoMo</option>
+                <option value="Bank">Bank Transfer</option>
+              </select>
+            </div>
+            {paymentMethod !== 'Cash' && (
               <div className="space-y-1">
-                <label className="block text-sm font-medium text-gray-700">Received By</label>
+                <label className="block text-sm font-medium text-gray-700">Account/Reference Number</label>
                 <input 
                   type="text"
-                  disabled
-                  className="w-full p-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500"
-                  value={userProfile?.displayName || userProfile?.email || ''}
+                  className="w-full p-2 border border-gray-200 rounded-lg"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
+                  placeholder={paymentMethod === 'MoMo' ? "MoMo Number" : "Transaction ID / Acc No"}
                 />
               </div>
-
-              <div className="space-y-1">
-                <label className="block text-sm font-medium text-gray-700">Notes (Optional)</label>
-                <textarea 
-                  className="w-full p-2 border border-gray-200 rounded-lg h-20 resize-none"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Reference number, check details, etc."
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={!selectedCustomer || !amount || processing}
-                className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-lg shadow-blue-200 flex items-center justify-center gap-2"
-              >
-                {processing ? 'Processing...' : (
-                  <>
-                    <CheckCircle2 size={20} />
-                    Record Payment
-                  </>
-                )}
-              </button>
-            </form>
+            )}
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">Date</label>
+              <input 
+                type="text"
+                disabled
+                className="w-full p-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500"
+                value={format(new Date(), 'MMM dd, yyyy')}
+              />
+            </div>
           </div>
-        </div>
-      )}
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">Received By</label>
+            <input 
+              type="text"
+              disabled
+              className="w-full p-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500"
+              value={userProfile?.displayName || userProfile?.email || ''}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">Notes (Optional)</label>
+            <textarea 
+              className="w-full p-2 border border-gray-200 rounded-lg h-20 resize-none"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Reference number, check details, etc."
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={!selectedCustomer || !amount || processing}
+            className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-lg shadow-blue-200 flex items-center justify-center gap-2"
+          >
+            {processing ? 'Processing...' : (
+              <>
+                <CheckCircle2 size={20} />
+                Record Payment
+              </>
+            )}
+          </button>
+        </form>
+      </Modal>
     </div>
   );
 }

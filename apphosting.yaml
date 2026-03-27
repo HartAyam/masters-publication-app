@@ -8,6 +8,16 @@ env:
   - variable: FIREBASE_SERVICE_ACCOUNT_KEY
     secret: FIREBASE_SERVICE_ACCOUNT_KEY
   - variable: VITE_FIREBASE_PROJECT_ID
-    value: "your-project-id" # Replace with your actual Project ID
+    value: "masters-publications-app"
   - variable: VITE_FIREBASE_DATABASE_ID
     value: "(default)"
+  - variable: VITE_FIREBASE_API_KEY
+    value: "AIzaSyAabvtGeapmMVjA81HmC7Wz6j3wnuxZOjc"
+  - variable: VITE_FIREBASE_AUTH_DOMAIN
+    value: "masters-publications-app.firebaseapp.com"
+  - variable: VITE_FIREBASE_STORAGE_BUCKET
+    value: "masters-publications-app.firebasestorage.app"
+  - variable: VITE_FIREBASE_MESSAGING_SENDER_ID
+    value: "586903405233"
+  - variable: VITE_FIREBASE_APP_ID
+    value: "1:586903405233:web:e4661fc56c1b5c8d50d890"

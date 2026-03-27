@@ -21,6 +21,9 @@ export default function Expenses() {
   const [approverName, setApproverName] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  
   
   // Ledger State
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -325,7 +328,14 @@ export default function Expenses() {
                 </tr>
               ) : (
                 paginatedExpenses.map((expense) => (
-                  <tr key={expense.id} className="hover:bg-gray-50">
+                  <tr 
+                    key={expense.id} 
+                    className="hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={() => {
+                      setSelectedExpense(expense);
+                      setShowDetailsModal(true);
+                    }}
+                  >
                     <td className="p-4 text-gray-500">
                       {expense.date?.seconds ? new Date(expense.date.seconds * 1000).toLocaleDateString() : 'Just now'}
                     </td>
@@ -354,6 +364,81 @@ export default function Expenses() {
           />
         </div>
       )}
+	  
+	  {/* Expense Details Modal */}
+      {showDetailsModal && selectedExpense && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-blue-50">
+              <h2 className="font-bold text-blue-900 flex items-center gap-2">
+                <CreditCard size={20} />
+                Expense Voucher Details
+              </h2>
+              <button onClick={() => setShowDetailsModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm text-gray-500 uppercase tracking-wider font-semibold">Recipient</p>
+                  <h3 className="text-xl font-bold text-gray-900">{selectedExpense.recipient}</h3>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-500 uppercase tracking-wider font-semibold">Amount</p>
+                  <h3 className="text-2xl font-black text-blue-600">{formatCurrency(selectedExpense.amount)}</h3>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Category</p>
+                  <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
+                    {selectedExpense.category}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Date</p>
+                  <p className="font-medium text-gray-900">
+                    {selectedExpense.date?.seconds ? format(new Date(selectedExpense.date.seconds * 1000), 'PPP p') : 'Just now'}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Description</p>
+                <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 text-gray-700 italic">
+                  {selectedExpense.description || 'No description provided'}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6 pt-4 border-t border-gray-100">
+                <div>
+                  <p className="text-sm text-gray-500 mb-1 flex items-center gap-1">
+                    <User size={14} />
+                    Approver
+                  </p>
+                  <p className="font-bold text-gray-900">{selectedExpense.approverName}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Branch</p>
+                  <p className="font-bold text-gray-900">{selectedExpense.branchId}</p>
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+	  
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import { Product, Branch } from '@/types';
 import { logActivity } from '@/services/audit';
 import { BRANCHES, cn, isGlobalUser } from '@/lib/utils';
@@ -40,24 +40,47 @@ export default function Inventory() {
   useEffect(() => {
     if (!userProfile) return;
 
-    let q;
+    let productsQ;
     if (isGlobalUser(userProfile.role)) {
-      q = query(collection(db, 'products'));
+      productsQ = query(collection(db, 'products'));
     } else {
-      q = query(collection(db, 'products'), where('branchId', '==', userProfile.branchId));
+      productsQ = query(collection(db, 'products'), where('branchId', '==', userProfile.branchId));
     }
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const productsData = snapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        damagedStock: 0, // Default for existing data
-        costPrice: 0, // Default for existing data
-        ...doc.data() 
-      } as Product));
-      setProducts(productsData);
+    let movementsQ;
+    if (isGlobalUser(userProfile.role)) {
+      movementsQ = query(collection(db, 'stock_movements'));
+    } else {
+      movementsQ = query(
+        collection(db, 'stock_movements'), 
+        where('branchId', '==', userProfile.branchId)
+      );
+    }
+
+    const unsubscribeProducts = onSnapshot(productsQ, (snapshot) => {
+      const productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+      
+      // We need movements to calculate damaged stock accurately
+      getDocs(movementsQ).then(movementsSnap => {
+        const allMovements = movementsSnap.docs.map(doc => doc.data() as any);
+        const damageMovements = allMovements.filter(m => m.type === 'Damage Report');
+        
+        const enrichedProducts = productsData.map(product => {
+          const calculatedDamaged = damageMovements
+            .filter(m => m.productId === product.id)
+            .reduce((sum, m) => sum + (m.quantity || 0), 0);
+
+          return {
+            ...product,
+            damagedStock: calculatedDamaged,
+            costPrice: product.costPrice || 0
+          };
+        });
+        setProducts(enrichedProducts);
+      });
     });
 
-    return () => unsubscribe();
+    return () => unsubscribeProducts();
   }, [userProfile]);
 
   const handleAddProduct = async (e: React.FormEvent) => {

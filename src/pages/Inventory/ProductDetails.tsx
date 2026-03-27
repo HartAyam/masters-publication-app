@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, increment, serverTimestamp, addDoc, collection } from 'firebase/firestore';
+import { Modal } from '@/components/common/Modal';
 import { Product } from '@/types';
 import { ArrowLeft, Package, AlertTriangle, CheckCircle, Truck, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -50,10 +51,29 @@ export default function ProductDetails() {
     try {
       const productRef = doc(db, 'products', id);
       
-      // Update stock level
-      await updateDoc(productRef, {
-        stockLevel: type === 'receive' ? increment(qty) : increment(-qty)
-      });
+      // Update stock level and damaged stock
+      if (type === 'damage') {
+        await updateDoc(productRef, {
+          stockLevel: increment(-qty),
+          damagedStock: increment(qty)
+        });
+
+        // Add to damaged_stock collection for dashboard tracking
+        await addDoc(collection(db, 'damaged_stock'), {
+          productId: id,
+          productName: product.name,
+          quantity: qty,
+          value: qty * (product.costPrice || product.price),
+          notes,
+          userId: userProfile?.uid,
+          timestamp: serverTimestamp(),
+          branchId: product.branchId
+        });
+      } else {
+        await updateDoc(productRef, {
+          stockLevel: increment(qty)
+        });
+      }
 
       // Log the activity (optional but good for tracking)
       await addDoc(collection(db, 'stock_movements'), {
@@ -172,111 +192,99 @@ export default function ProductDetails() {
       </div>
 
       {/* Receive Stock Modal */}
-      {showStockModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Receive New Stock</h2>
-              <button onClick={() => setShowStockModal(false)} className="text-gray-400 hover:text-gray-600">
-                <X size={24} />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity Received</label>
-                <input
-                  type="number"
-                  min="1"
-                  className="w-full p-2 border border-gray-200 rounded-lg"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  placeholder="Enter quantity"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
-                <textarea
-                  className="w-full p-2 border border-gray-200 rounded-lg"
-                  rows={3}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Supplier details, invoice number, etc."
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => setShowStockModal(false)}
-                  className="flex-1 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleStockUpdate('receive')}
-                  disabled={actionLoading || !quantity}
-                  className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {actionLoading ? 'Updating...' : 'Confirm Receipt'}
-                </button>
-              </div>
-            </div>
+      <Modal 
+        isOpen={showStockModal} 
+        onClose={() => setShowStockModal(false)} 
+        title="Receive New Stock"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Quantity Received</label>
+            <input
+              type="number"
+              min="1"
+              className="w-full p-2 border border-gray-200 rounded-lg"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              placeholder="Enter quantity"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
+            <textarea
+              className="w-full p-2 border border-gray-200 rounded-lg"
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Supplier details, invoice number, etc."
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setShowStockModal(false)}
+              className="flex-1 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleStockUpdate('receive')}
+              disabled={actionLoading || !quantity}
+              className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {actionLoading ? 'Updating...' : 'Confirm Receipt'}
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
 
       {/* Report Damage Modal */}
-      {showDamageModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-red-600">Report Damaged Items</h2>
-              <button onClick={() => setShowDamageModal(false)} className="text-gray-400 hover:text-gray-600">
-                <X size={24} />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div className="bg-red-50 p-3 rounded-lg text-sm text-red-700">
-                This will deduct items from your current stock level.
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity Damaged</label>
-                <input
-                  type="number"
-                  min="1"
-                  className="w-full p-2 border border-gray-200 rounded-lg"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  placeholder="Enter quantity"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reason / Notes</label>
-                <textarea
-                  className="w-full p-2 border border-gray-200 rounded-lg"
-                  rows={3}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Describe the damage..."
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => setShowDamageModal(false)}
-                  className="flex-1 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleStockUpdate('damage')}
-                  disabled={actionLoading || !quantity}
-                  className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                >
-                  {actionLoading ? 'Updating...' : 'Confirm Damage'}
-                </button>
-              </div>
-            </div>
+      <Modal 
+        isOpen={showDamageModal} 
+        onClose={() => setShowDamageModal(false)} 
+        title="Report Damaged Items"
+      >
+        <div className="space-y-4">
+          <div className="bg-red-50 p-3 rounded-lg text-sm text-red-700">
+            This will deduct items from your current stock level.
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Quantity Damaged</label>
+            <input
+              type="number"
+              min="1"
+              className="w-full p-2 border border-gray-200 rounded-lg"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              placeholder="Enter quantity"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Reason / Notes</label>
+            <textarea
+              className="w-full p-2 border border-gray-200 rounded-lg"
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Describe the damage..."
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setShowDamageModal(false)}
+              className="flex-1 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleStockUpdate('damage')}
+              disabled={actionLoading || !quantity}
+              className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+            >
+              {actionLoading ? 'Updating...' : 'Confirm Damage'}
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
