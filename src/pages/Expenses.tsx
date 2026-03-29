@@ -9,27 +9,35 @@ import { exportToCSV, printDiv } from '@/lib/exportUtils';
 import { format, startOfWeek, startOfMonth, startOfQuarter, startOfYear, isAfter } from 'date-fns';
 import { formatCurrency } from '@/lib/idUtils';
 import Pagination from '@/components/common/Pagination';
-import { Branch } from '@/types';
-import { BRANCHES, isGlobalUser } from '@/lib/utils';
+import { Branch, BranchModel } from '@/types';
+import { isGlobalUser } from '@/lib/utils';
+import { useBranches } from '@/hooks/useBranches';
 
 export default function Expenses() {
   const { userProfile } = useAuth();
+  const { branches: dbBranches } = useBranches();
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('Operations');
   const [recipient, setRecipient] = useState('');
   const [description, setDescription] = useState('');
   const [approverName, setApproverName] = useState('');
+  const [branchId, setBranchId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   
+  useEffect(() => {
+    if (dbBranches.length > 0 && !branchId) {
+      setBranchId(dbBranches[0].name);
+    }
+  }, [dbBranches]);
   
   // Ledger State
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<'ALL' | 'WEEK' | 'MONTH' | 'QUARTER' | 'YEAR'>('ALL');
-  const [selectedBranch, setSelectedBranch] = useState<Branch | 'ALL'>('ALL');
+  const [selectedBranch, setSelectedBranch] = useState<string | 'ALL'>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
@@ -104,7 +112,7 @@ export default function Expenses() {
         description,
         issuerId: userProfile.uid,
         approverName,
-        branchId: userProfile.branchId,
+        branchId: isGlobalUser(userProfile.role) ? branchId : userProfile.branchId,
       });
 
       // Log activity
@@ -113,7 +121,7 @@ export default function Expenses() {
         `${formatCurrency(parseFloat(amount))} for ${category} by ${userProfile.email}`,
         userProfile.uid,
         userProfile.role,
-        userProfile.branchId
+        isGlobalUser(userProfile.role) ? branchId : userProfile.branchId
       );
 
       setShowAddModal(false);
@@ -209,8 +217,8 @@ export default function Expenses() {
             onChange={(e: any) => setSelectedBranch(e.target.value)}
           >
             <option value="ALL">All Branches</option>
-            {BRANCHES.map(b => (
-              <option key={b} value={b}>{b}</option>
+            {dbBranches.map(b => (
+              <option key={b.id} value={b.name}>{b.name}</option>
             ))}
           </select>
         )}
@@ -258,6 +266,22 @@ export default function Expenses() {
                   </select>
                 </div>
               </div>
+
+              {isGlobalUser(userProfile?.role) && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Branch</label>
+                  <select
+                    className="w-full p-2 border border-gray-200 rounded-lg"
+                    value={branchId}
+                    onChange={(e) => setBranchId(e.target.value)}
+                    required
+                  >
+                    {dbBranches.map(b => (
+                      <option key={b.id} value={b.name}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Recipient / Payee</label>

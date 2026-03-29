@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, where } from 'firebase/firestore';
 import { FixedAsset, Branch } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { Plus, Search, Trash2, Edit2, Save, X, Package } from 'lucide-react';
@@ -46,6 +46,23 @@ export default function FixedAssets() {
     e.preventDefault();
     setLoading(true);
     try {
+      // Check for duplicates when adding new asset
+      if (!editingAsset) {
+        const duplicateQuery = query(
+          collection(db, 'fixed_assets'),
+          where('name', '==', name),
+          where('branchId', '==', branchId)
+        );
+        
+        const duplicateSnapshot = await getDocs(duplicateQuery);
+        
+        if (!duplicateSnapshot.empty) {
+          alert('An asset with this name already exists in this branch.');
+          setLoading(false);
+          return;
+        }
+      }
+
       const assetData = {
         name,
         category,

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, where, addDoc, serverTimestamp, doc, updateDoc, increment, getDoc, getDocs } from 'firebase/firestore';
-import { Payment, Branch, Customer } from '@/types';
+import { Payment, Branch, BranchModel, Customer } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import { useBranches } from '@/hooks/useBranches';
 import { Modal } from '@/components/common/Modal';
 import { 
   Search, 
@@ -24,17 +25,18 @@ import { Pagination } from '@/components/common/Pagination';
 import { exportToCSV, printDiv } from '@/lib/exportUtils';
 import { logActivity } from '@/services/audit';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { cn, BRANCHES, isGlobalUser } from '@/lib/utils';
+import { cn, isGlobalUser } from '@/lib/utils';
 
 export default function PaymentsList() {
   const { userProfile } = useAuth();
+  const { branches: dbBranches } = useBranches();
   const location = useLocation();
   const navigate = useNavigate();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedBranch, setSelectedBranch] = useState<Branch | 'ALL'>('ALL');
+  const [selectedBranch, setSelectedBranch] = useState<string | 'ALL'>('ALL');
   const [dateRange, setDateRange] = useState({
     start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
     end: format(endOfMonth(new Date()), 'yyyy-MM-dd')
@@ -283,8 +285,8 @@ export default function PaymentsList() {
             onChange={(e: any) => setSelectedBranch(e.target.value)}
           >
             <option value="ALL">All Branches</option>
-            {BRANCHES.map(b => (
-              <option key={b} value={b}>{b}</option>
+            {dbBranches.map(b => (
+              <option key={b.id} value={b.name}>{b.name}</option>
             ))}
           </select>
         )}

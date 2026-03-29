@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
-import { Transaction, Branch } from '../../types';
-import { BRANCHES, isGlobalUser } from '../../lib/utils';
+import { Transaction, Branch, BranchModel } from '../../types';
+import { isGlobalUser } from '../../lib/utils';
+import { useBranches } from '@/hooks/useBranches';
 import { Search, Plus, ChevronRight, CheckSquare, Square, Calendar, Download, Printer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { exportToCSV, printDiv } from '@/lib/exportUtils';
@@ -17,10 +18,11 @@ const TYPES = ['Cash Sale', 'Credit Sale', 'Deposit', 'Stock Return'];
 export default function OrdersList() {
   const { userProfile } = useAuth();
   const navigate = useNavigate();
+  const { branches: dbBranches } = useBranches();
   const [orders, setOrders] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedBranch, setSelectedBranch] = useState<Branch | 'ALL'>('ALL');
+  const [selectedBranch, setSelectedBranch] = useState<string | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [selectedType, setSelectedType] = useState<string>('ALL');
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
@@ -181,11 +183,11 @@ export default function OrdersList() {
               <select
                 className="w-full p-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 value={selectedBranch}
-                onChange={(e) => setSelectedBranch(e.target.value as Branch | 'ALL')}
+                onChange={(e) => setSelectedBranch(e.target.value)}
               >
                 <option value="ALL">All Branches</option>
-                {BRANCHES.map(branch => (
-                  <option key={branch} value={branch}>{branch}</option>
+                {dbBranches.map(branch => (
+                  <option key={branch.id} value={branch.name}>{branch.name}</option>
                 ))}
               </select>
             </div>

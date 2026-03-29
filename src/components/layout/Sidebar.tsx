@@ -122,8 +122,8 @@ export const Sidebar = () => {
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-4 [&::-webkit-scrollbar]:hidden [scrollbar-width:none] [-ms-overflow-style:none]">
-          <ul className="space-y-2 px-4 min-w-[256px]">
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 [&::-webkit-scrollbar]:hidden [scrollbar-width:none] [-ms-overflow-style:none]">
+          <ul className={cn("space-y-2 px-4 transition-all duration-300", isCollapsed && !isOpen ? "w-20" : "w-64")}>
             {filteredLinks.map((link) => {
               const Icon = link.icon;
               const isActive = location.pathname === link.href;
@@ -148,7 +148,7 @@ export const Sidebar = () => {
           </ul>
         </nav>
 
-        <div className="p-4 border-t border-gray-800 min-w-[256px]">
+        <div className={cn("p-4 border-t border-gray-800 transition-all duration-300", isCollapsed && !isOpen ? "w-20" : "w-64")}>
           <button
             onClick={logout}
             className="flex items-center gap-3 px-4 py-3 w-full text-left text-red-400 hover:bg-gray-800 rounded-lg transition-colors whitespace-nowrap"

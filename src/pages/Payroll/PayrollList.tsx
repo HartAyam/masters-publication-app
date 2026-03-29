@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { PayrollRecord, Branch } from '@/types';
-import { BRANCHES, isGlobalUser } from '@/lib/utils';
+import { PayrollRecord, Branch, BranchModel } from '@/types';
+import { isGlobalUser } from '@/lib/utils';
+import { useBranches } from '@/hooks/useBranches';
 import { useAuth } from '@/context/AuthContext';
 import { Plus, DollarSign, FileText, X, Search, CheckCircle, Printer, Download } from 'lucide-react';
 import { format } from 'date-fns';
@@ -13,6 +14,7 @@ import { printDiv, exportToCSV } from '@/lib/exportUtils';
 
 export default function PayrollList() {
   const { userProfile } = useAuth();
+  const { branches: dbBranches } = useBranches();
   const [payrolls, setPayrolls] = useState<PayrollRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -23,7 +25,7 @@ export default function PayrollList() {
   
   // Filters
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [selectedBranch, setSelectedBranch] = useState<Branch | 'ALL'>('ALL');
+  const [selectedBranch, setSelectedBranch] = useState<string | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
 
   // Form State
@@ -34,7 +36,13 @@ export default function PayrollList() {
   const [paye, setPaye] = useState('0');
   const [otherDeductions, setOtherDeductions] = useState('0');
   const [bonuses, setBonuses] = useState('0');
-  const [branchId, setBranchId] = useState<Branch>(BRANCHES[0] as Branch);
+  const [branchId, setBranchId] = useState<string>('');
+
+  useEffect(() => {
+    if (dbBranches.length > 0 && !branchId) {
+      setBranchId(dbBranches[0].name);
+    }
+  }, [dbBranches]);
   
   // Staff Search
   const [staff, setStaff] = useState<any[]>([]);
@@ -280,11 +288,11 @@ export default function PayrollList() {
               <select
                 className="w-full p-2 border border-gray-200 rounded-lg"
                 value={selectedBranch}
-                onChange={(e) => setSelectedBranch(e.target.value as Branch | 'ALL')}
+                onChange={(e) => setSelectedBranch(e.target.value)}
               >
                 <option value="ALL">All Branches</option>
-                {BRANCHES.map(branch => (
-                  <option key={branch} value={branch}>{branch}</option>
+                {dbBranches.map(branch => (
+                  <option key={branch.id} value={branch.name}>{branch.name}</option>
                 ))}
               </select>
             </div>
@@ -528,9 +536,9 @@ export default function PayrollList() {
                   <select
                     className="w-full p-2 border border-gray-200 rounded-lg"
                     value={branchId}
-                    onChange={(e) => setBranchId(e.target.value as Branch)}
+                    onChange={(e) => setBranchId(e.target.value)}
                   >
-                    {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                    {dbBranches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                   </select>
                 </div>
               )}

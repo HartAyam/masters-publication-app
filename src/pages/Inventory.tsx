@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, getDocs } from 'firebase/firestore';
-import { Product, Branch } from '@/types';
+import { Product, Branch, BranchModel } from '@/types';
 import { logActivity } from '@/services/audit';
-import { BRANCHES, cn, isGlobalUser } from '@/lib/utils';
+import { cn, isGlobalUser } from '@/lib/utils';
+import { useBranches } from '@/hooks/useBranches';
 import { Plus, AlertTriangle, Package, Search, Download, Printer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { exportToCSV, printDiv } from '@/lib/exportUtils';
@@ -15,6 +16,7 @@ import Pagination from '@/components/common/Pagination';
 export default function Inventory() {
   const { userProfile } = useAuth();
   const navigate = useNavigate();
+  const { branches: dbBranches } = useBranches();
   const [products, setProducts] = useState<Product[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -23,7 +25,7 @@ export default function Inventory() {
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedBranch, setSelectedBranch] = useState<Branch | 'ALL'>('ALL');
+  const [selectedBranch, setSelectedBranch] = useState<string | 'ALL'>('ALL');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [viewTab, setViewTab] = useState<'ALL' | 'LOW' | 'DAMAGED'>('ALL');
 
@@ -35,7 +37,13 @@ export default function Inventory() {
   const [costPrice, setCostPrice] = useState('');
   const [stockLevel, setStockLevel] = useState('');
   const [minStockLevel, setMinStockLevel] = useState('10');
-  const [branchId, setBranchId] = useState<Branch>(BRANCHES[0] as Branch);
+  const [branchId, setBranchId] = useState<string>('');
+
+  useEffect(() => {
+    if (dbBranches.length > 0 && !branchId) {
+      setBranchId(dbBranches[0].name);
+    }
+  }, [dbBranches]);
 
   useEffect(() => {
     if (!userProfile) return;
@@ -88,6 +96,25 @@ export default function Inventory() {
     setLoading(true);
 
     try {
+      const targetBranch = isGlobalUser(userProfile?.role) ? branchId : userProfile?.branchId;
+      
+      // Check for duplicates
+      const duplicateQuery = query(
+        collection(db, 'products'),
+        where('name', '==', name),
+        where('sku', '==', sku),
+        where('category', '==', category),
+        where('branchId', '==', targetBranch)
+      );
+      
+      const duplicateSnapshot = await getDocs(duplicateQuery);
+      
+      if (!duplicateSnapshot.empty) {
+        alert('A product with the same name, SKU, category, and branch already exists.');
+        setLoading(false);
+        return;
+      }
+
       await addDoc(collection(db, 'products'), {
         name,
         sku,
@@ -97,7 +124,7 @@ export default function Inventory() {
         stockLevel: parseInt(stockLevel),
         minStockLevel: parseInt(minStockLevel),
         damagedStock: 0,
-        branchId: isGlobalUser(userProfile?.role) ? branchId : userProfile?.branchId,
+        branchId: targetBranch,
       });
 
       setShowAddForm(false);
@@ -264,11 +291,11 @@ export default function Inventory() {
               <select
                 className="w-full p-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={selectedBranch}
-                onChange={(e) => setSelectedBranch(e.target.value as Branch | 'ALL')}
+                onChange={(e) => setSelectedBranch(e.target.value)}
               >
                 <option value="ALL">All Branches</option>
-                {BRANCHES.map(branch => (
-                  <option key={branch} value={branch}>{branch}</option>
+                {dbBranches.map(branch => (
+                  <option key={branch.id} value={branch.name}>{branch.name}</option>
                 ))}
               </select>
             </div>
@@ -355,9 +382,9 @@ export default function Inventory() {
               <select
                 className="p-2 border border-gray-200 rounded-lg"
                 value={branchId}
-                onChange={(e) => setBranchId(e.target.value as Branch)}
+                onChange={(e) => setBranchId(e.target.value)}
               >
-                {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                {dbBranches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
               </select>
             )}
 

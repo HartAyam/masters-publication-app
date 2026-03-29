@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, query, where, onSnapshot, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { Customer, ClientType, Branch } from '@/types';
-import { BRANCHES, isGlobalUser } from '@/lib/utils';
+import { collection, addDoc, query, where, onSnapshot, updateDoc, doc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { Customer, ClientType, Branch, BranchModel } from '@/types';
+import { isGlobalUser } from '@/lib/utils';
+import { useBranches } from '@/hooks/useBranches';
 import { Plus, Search, User, Building, Edit2, X, Download, Printer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { exportToCSV, printDiv } from '@/lib/exportUtils';
@@ -14,12 +15,13 @@ import Pagination from '@/components/common/Pagination';
 export default function ClientsList() {
   const { userProfile } = useAuth();
   const navigate = useNavigate();
+  const { branches: dbBranches } = useBranches();
   const [clients, setClients] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingClient, setEditingClient] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(false);
-  const [selectedBranch, setSelectedBranch] = useState<Branch | 'ALL'>('ALL');
+  const [selectedBranch, setSelectedBranch] = useState<string | 'ALL'>('ALL');
   const [selectedType, setSelectedType] = useState<ClientType | 'ALL'>('ALL');
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -31,7 +33,13 @@ export default function ClientsList() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
-  const [primaryBranch, setPrimaryBranch] = useState<Branch>(BRANCHES[0] as Branch);
+  const [primaryBranch, setPrimaryBranch] = useState<string>('');
+
+  useEffect(() => {
+    if (dbBranches.length > 0 && !primaryBranch) {
+      setPrimaryBranch(dbBranches[0].name);
+    }
+  }, [dbBranches]);
   
   // Contact Person State
   const [contactName, setContactName] = useState('');
@@ -63,6 +71,29 @@ export default function ClientsList() {
     setLoading(true);
 
     try {
+      // Check for duplicates when adding new client
+      if (!editingClient) {
+        // Check phone
+        const phoneQuery = query(collection(db, 'customers'), where('phone', '==', phone));
+        const phoneSnapshot = await getDocs(phoneQuery);
+        if (!phoneSnapshot.empty) {
+          alert('A client with this phone number already exists.');
+          setLoading(false);
+          return;
+        }
+
+        // Check email if provided
+        if (email) {
+          const emailQuery = query(collection(db, 'customers'), where('email', '==', email));
+          const emailSnapshot = await getDocs(emailQuery);
+          if (!emailSnapshot.empty) {
+            alert('A client with this email already exists.');
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       const clientData: any = {
         name,
         type,
@@ -129,7 +160,7 @@ export default function ClientsList() {
       setPhone('');
       setEmail('');
       setAddress('');
-      setPrimaryBranch(isGlobalUser(userProfile?.role || '') ? 'Gyinyase' : userProfile?.branchId || 'Gyinyase');
+      setPrimaryBranch(isGlobalUser(userProfile?.role || '') ? (dbBranches[0]?.name || '') : userProfile?.branchId || (dbBranches[0]?.name || ''));
       setContactName('');
       setContactPhone('');
       setContactEmail('');
@@ -237,11 +268,11 @@ export default function ClientsList() {
               <select
                 className="w-full p-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={selectedBranch}
-                onChange={(e) => setSelectedBranch(e.target.value as Branch | 'ALL')}
+                onChange={(e) => setSelectedBranch(e.target.value)}
               >
                 <option value="ALL">All Branches</option>
-                {BRANCHES.map(branch => (
-                  <option key={branch} value={branch}>{branch}</option>
+                {dbBranches.map(branch => (
+                  <option key={branch.id} value={branch.name}>{branch.name}</option>
                 ))}
               </select>
             </div>
@@ -470,9 +501,9 @@ export default function ClientsList() {
                   <select
                     className="w-full p-2 border border-gray-200 rounded-lg"
                     value={primaryBranch}
-                    onChange={e => setPrimaryBranch(e.target.value as Branch)}
+                    onChange={e => setPrimaryBranch(e.target.value)}
                   >
-                    {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                    {dbBranches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                   </select>
                 </div>
               )}

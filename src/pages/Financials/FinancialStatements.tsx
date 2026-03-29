@@ -4,16 +4,17 @@ import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
 import { startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subMonths, subYears, format, startOfWeek, endOfWeek } from 'date-fns';
-import { Transaction, Expense, Payment, Product, FixedAsset, Supplier, Branch } from '@/types';
+import { Transaction, Expense, Payment, Product, FixedAsset, Supplier, Branch, BranchModel } from '@/types';
 import { exportToCSV, printDiv } from '@/lib/exportUtils';
-
-import { isGlobalUser, BRANCHES } from '@/lib/utils';
+import { isGlobalUser } from '@/lib/utils';
+import { useBranches } from '@/hooks/useBranches';
 
 export default function FinancialStatements() {
   const { userProfile } = useAuth();
+  const { branches: dbBranches } = useBranches();
   const [reportType, setReportType] = useState('Income Statement');
   const [period, setPeriod] = useState('This Month');
-  const [selectedBranch, setSelectedBranch] = useState<Branch | 'All'>(userProfile?.branchId || 'All');
+  const [selectedBranch, setSelectedBranch] = useState<string | 'All'>(userProfile?.branchId || 'All');
   const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
   const [generating, setGenerating] = useState(false);
@@ -288,12 +289,12 @@ export default function FinancialStatements() {
               <select
                 className="w-full p-2 border border-gray-200 rounded-lg"
                 value={selectedBranch}
-                onChange={(e) => setSelectedBranch(e.target.value as Branch | 'All')}
+                onChange={(e) => setSelectedBranch(e.target.value)}
                 disabled={!isGlobalUser(userProfile?.role || '')}
               >
                 <option value="All">All Branches</option>
-                {BRANCHES.map(b => (
-                  <option key={b} value={b}>{b}</option>
+                {dbBranches.map(b => (
+                  <option key={b.id} value={b.name}>{b.name}</option>
                 ))}
               </select>
             </div>

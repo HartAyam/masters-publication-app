@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { UserProfile, Role, Branch } from '@/types';
-import { BRANCHES } from '@/lib/utils';
+import { UserProfile, Role, Branch, BranchModel } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import { useBranches } from '@/hooks/useBranches';
 import { ArrowLeft, User, Mail, Shield, MapPin, Save, Phone, DollarSign, Calendar, Clock, Trash2 } from 'lucide-react';
 import { format, differenceInYears } from 'date-fns';
 import { formatCurrency } from '@/lib/idUtils';
@@ -13,6 +13,7 @@ export default function StaffDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { userProfile } = useAuth();
+  const { branches: dbBranches } = useBranches();
   const [staff, setStaff] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -20,7 +21,7 @@ export default function StaffDetails() {
   // Form State
   const [displayName, setDisplayName] = useState('');
   const [role, setRole] = useState<Role>('Cashier');
-  const [branchId, setBranchId] = useState<Branch>(BRANCHES[0] as Branch);
+  const [branchId, setBranchId] = useState<string>('');
   const [phone, setPhone] = useState('');
   const [basicSalary, setBasicSalary] = useState('');
   const [hireDate, setHireDate] = useState('');
@@ -212,9 +213,9 @@ export default function StaffDetails() {
                   <select
                     className="w-full p-2 border border-gray-200 rounded-lg"
                     value={branchId}
-                    onChange={e => setBranchId(e.target.value as Branch)}
+                    onChange={e => setBranchId(e.target.value)}
                   >
-                    {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                    {dbBranches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                   </select>
                 </div>
               </div>

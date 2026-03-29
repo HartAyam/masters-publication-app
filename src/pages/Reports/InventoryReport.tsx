@@ -1,22 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { Product, Transaction, UserProfile } from '@/types';
+import { Product, Transaction, UserProfile, BranchModel } from '@/types';
 import { ArrowLeft, Download, Printer, Calendar, Search, Package } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { exportToCSV, printDiv } from '@/lib/exportUtils';
 import { useAuth } from '@/context/AuthContext';
-import { cn, BRANCHES, isGlobalUser } from '@/lib/utils';
+import { useBranches } from '@/hooks/useBranches';
+import { cn, isGlobalUser } from '@/lib/utils';
 import { formatCurrency } from '@/lib/idUtils';
 
 export default function InventoryReport() {
   const navigate = useNavigate();
   const { userProfile } = useAuth();
+  const { branches: dbBranches } = useBranches();
   const [loading, setLoading] = useState(true);
   const [reportData, setReportData] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedBranch, setSelectedBranch] = useState<string>(isGlobalUser(userProfile?.role || '') ? 'ALL' : userProfile?.branchId || 'Gyinyase');
+  const [selectedBranch, setSelectedBranch] = useState<string>(isGlobalUser(userProfile?.role || '') ? 'ALL' : userProfile?.branchId || 'ALL');
 
   useEffect(() => {
     if (userProfile) {
@@ -201,7 +203,7 @@ export default function InventoryReport() {
                 onChange={(e) => setSelectedBranch(e.target.value)}
               >
                 <option value="ALL">All Branches</option>
-                {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                {dbBranches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
               </select>
             </div>
           )}

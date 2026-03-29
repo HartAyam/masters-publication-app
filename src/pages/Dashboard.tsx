@@ -6,7 +6,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
   ResponsiveContainer, LineChart, Line, Cell, PieChart, Pie
 } from 'recharts';
-import { ActivityLog, Transaction, Product, Customer, Expense, PayrollRecord, Branch, Payment, Supplier } from '@/types';
+import { ActivityLog, Transaction, Product, Customer, Expense, PayrollRecord, Branch, BranchModel, Payment, Supplier } from '@/types';
 import { 
   Activity, DollarSign, Package, AlertTriangle, TrendingUp, 
   TrendingDown, Users, CreditCard, ShoppingCart, Calendar, Filter,
@@ -14,7 +14,8 @@ import {
 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, isWithinInterval, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
-import { BRANCHES, cn, isGlobalUser } from '@/lib/utils';
+import { cn, isGlobalUser } from '@/lib/utils';
+import { useBranches } from '@/hooks/useBranches';
 import Pagination from '@/components/common/Pagination';
 import { formatCurrency } from '@/lib/idUtils';
 import { useNavigate } from 'react-router-dom';
@@ -41,6 +42,7 @@ interface DashboardStats {
 export default function Dashboard() {
   const { userProfile } = useAuth();
   const navigate = useNavigate();
+  const { branches: dbBranches } = useBranches();
   const [loading, setLoading] = useState(true);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [recentPayments, setRecentPayments] = useState<Payment[]>([]);
@@ -55,7 +57,7 @@ export default function Dashboard() {
     start: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
     end: format(new Date(), 'yyyy-MM-dd')
   });
-  const [selectedBranch, setSelectedBranch] = useState<Branch | 'ALL'>(isGlobalUser(userProfile?.role) ? 'ALL' : (userProfile?.branchId || 'ALL'));
+  const [selectedBranch, setSelectedBranch] = useState<string | 'ALL'>(isGlobalUser(userProfile?.role) ? 'ALL' : (userProfile?.branchId || 'ALL'));
 
   const [stats, setStats] = useState<DashboardStats>({
     totalRevenue: 0,
@@ -434,11 +436,11 @@ export default function Dashboard() {
               <select 
                 className="text-sm border-none focus:ring-0 p-0 bg-transparent"
                 value={selectedBranch}
-                onChange={(e) => setSelectedBranch(e.target.value as Branch | 'ALL')}
+                onChange={(e) => setSelectedBranch(e.target.value)}
               >
                 <option value="ALL">All Branches</option>
-                {BRANCHES.filter(b => b !== 'ALL').map(b => (
-                  <option key={b} value={b}>{b}</option>
+                {dbBranches.map(b => (
+                  <option key={b.id} value={b.name}>{b.name}</option>
                 ))}
               </select>
             </div>

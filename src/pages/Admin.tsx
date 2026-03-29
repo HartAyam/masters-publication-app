@@ -3,7 +3,8 @@ import { useAuth } from '@/context/AuthContext';
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, setDoc, doc, getDocs, updateDoc, deleteDoc, writeBatch, query } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, sendPasswordResetEmail, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
-import { ROLES, BRANCHES, isGlobalUser } from '@/lib/utils';
+import { ROLES, isGlobalUser } from '@/lib/utils';
+import { useBranches } from '@/hooks/useBranches';
 import { generateUserId } from '@/lib/idUtils';
 import { Edit2, Trash2, X, Save, RefreshCw, AlertTriangle, Database, Key } from 'lucide-react';
 import { UserProfile } from '@/types';
@@ -11,10 +12,11 @@ import { Modal, ConfirmModal } from '@/components/common/Modal';
 
 export default function Admin() {
   const { userProfile, user } = useAuth();
+  const { branches: dbBranches, loading: branchesLoading } = useBranches();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState(ROLES[0]);
-  const [branch, setBranch] = useState(BRANCHES[0]);
+  const [branch, setBranch] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   
@@ -46,6 +48,12 @@ export default function Admin() {
     fetchUsers();
     checkSystemHealth();
   }, []);
+
+  useEffect(() => {
+    if (dbBranches.length > 0 && !branch) {
+      setBranch(dbBranches[0].name);
+    }
+  }, [dbBranches, branch]);
 
   const checkSystemHealth = async () => {
     if (!user) return;
@@ -361,7 +369,7 @@ export default function Admin() {
                   onChange={(e) => setBranch(e.target.value)}
                   disabled={isGlobalUser(role)}
                 >
-                  {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                  {dbBranches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                 </select>
                 {isGlobalUser(role) && (
                   <p className="text-xs text-gray-500 mt-1">Headquarters (Gyinyase)</p>
@@ -387,7 +395,7 @@ export default function Admin() {
               </div>
               <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                 <span className="text-sm text-gray-600">Active Branches</span>
-                <span className="font-bold">{BRANCHES.length}</span>
+                <span className="font-bold">{dbBranches.length}</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                 <span className="text-sm text-gray-600">Database Status</span>
@@ -520,7 +528,7 @@ export default function Admin() {
                     onChange={e => setEditBranch(e.target.value as any)}
                     disabled={isGlobalUser(editRole)}
                   >
-                    {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                    {dbBranches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                   </select>
                 </div>
               </div>

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, getDocs, addDoc, serverTimestamp, where } from 'firebase/firestore';
-import { UserProfile, Role, Branch } from '@/types';
-import { BRANCHES } from '@/lib/utils';
+import { UserProfile, Role } from '@/types';
+import { useBranches } from '@/hooks/useBranches';
 import { useAuth } from '@/context/AuthContext';
 import { Plus, Search, User, X, Download, Printer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -13,6 +13,7 @@ import Pagination from '@/components/common/Pagination';
 
 export default function StaffList() {
   const { userProfile } = useAuth();
+  const { branches: dbBranches } = useBranches();
   const navigate = useNavigate();
   const [staff, setStaff] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +26,7 @@ export default function StaffList() {
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [role, setRole] = useState<Role>('Cashier');
-  const [branchId, setBranchId] = useState<Branch>(BRANCHES[0] as Branch);
+  const [branchId, setBranchId] = useState('');
   const [phone, setPhone] = useState('');
   const [basicSalary, setBasicSalary] = useState('');
   const [hireDate, setHireDate] = useState('');
@@ -38,6 +39,12 @@ export default function StaffList() {
   useEffect(() => {
     fetchStaff();
   }, []);
+
+  useEffect(() => {
+    if (dbBranches.length > 0 && !branchId) {
+      setBranchId(dbBranches[0].name);
+    }
+  }, [dbBranches, branchId]);
 
   const fetchStaff = async () => {
     setLoading(true);
@@ -61,6 +68,21 @@ export default function StaffList() {
     if (!canEdit) return;
     setLoading(true);
     try {
+      // Check for duplicates
+      const duplicateQuery = query(
+        collection(db, 'users'),
+        where('email', '==', email),
+        where('branchId', '==', branchId)
+      );
+      
+      const duplicateSnapshot = await getDocs(duplicateQuery);
+      
+      if (!duplicateSnapshot.empty) {
+        alert('A staff member with the same email already exists in this branch.');
+        setLoading(false);
+        return;
+      }
+
       // In a real app, you'd trigger a cloud function to create the Auth user.
       // Here we just add the document.
       await addDoc(collection(db, 'users'), {
@@ -324,9 +346,9 @@ export default function StaffList() {
                   <select
                     className="w-full p-2 border border-gray-200 rounded-lg"
                     value={branchId}
-                    onChange={e => setBranchId(e.target.value as Branch)}
+                    onChange={e => setBranchId(e.target.value)}
                   >
-                    {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                    {dbBranches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                   </select>
                 </div>
               </div>

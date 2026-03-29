@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, getDocs, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, getDocs, addDoc, serverTimestamp, deleteDoc, doc, where } from 'firebase/firestore';
 import { BranchModel } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { Plus, Search, MapPin, Phone, User, X } from 'lucide-react';
@@ -92,6 +92,20 @@ export default function BranchesList() {
     if (!canEdit) return;
     setLoading(true);
     try {
+      // Check for duplicates
+      const duplicateQuery = query(
+        collection(db, 'branches'),
+        where('name', '==', name)
+      );
+      
+      const duplicateSnapshot = await getDocs(duplicateQuery);
+      
+      if (!duplicateSnapshot.empty) {
+        alert('A branch with this name already exists.');
+        setLoading(false);
+        return;
+      }
+
       await addDoc(collection(db, 'branches'), {
         name,
         location,
