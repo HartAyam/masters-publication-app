@@ -14,6 +14,7 @@ export default function Admin() {
   const { userProfile, user } = useAuth();
   const { branches: dbBranches, loading: branchesLoading } = useBranches();
   const [email, setEmail] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState(ROLES[0]);
   const [branch, setBranch] = useState('');
@@ -23,6 +24,7 @@ export default function Admin() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [editEmail, setEditEmail] = useState('');
+  const [editDisplayName, setEditDisplayName] = useState('');
   const [editRole, setEditRole] = useState('');
   const [editBranch, setEditBranch] = useState('');
 
@@ -99,6 +101,7 @@ export default function Admin() {
         body: JSON.stringify({
           email,
           password,
+          displayName,
           role,
           branchId: branch,
           customId,
@@ -111,6 +114,7 @@ export default function Admin() {
 
       setMessage(`User ${email} created successfully with ID: ${customId}`);
       setEmail('');
+      setDisplayName('');
       setPassword('');
       fetchUsers();
     } catch (error: any) {
@@ -124,6 +128,7 @@ export default function Admin() {
   const handleEditClick = (user: UserProfile) => {
     setEditingUser(user);
     setEditEmail(user.email);
+    setEditDisplayName(user.displayName || '');
     setEditRole(user.role);
     setEditBranch(user.branchId);
   };
@@ -153,6 +158,7 @@ export default function Admin() {
       // 2. Update Firestore Profile
       await updateDoc(doc(db, 'users', editingUser.uid), {
         email: editEmail,
+        displayName: editDisplayName,
         role: editRole,
         branchId: isGlobalUser(editRole) ? 'Gyinyase' : editBranch,
       });
@@ -331,6 +337,16 @@ export default function Admin() {
             
             <form onSubmit={handleCreateUser} className="space-y-4">
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
+              <input
+                type="text"
+                required
+                className="w-full p-2 border border-gray-200 rounded-lg"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+              />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <input
                 type="email"
@@ -419,6 +435,7 @@ export default function Admin() {
               <table className="w-full text-left text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
+                    <th className="p-4 font-medium text-gray-600">Display Name</th>
                     <th className="p-4 font-medium text-gray-600">Email</th>
                     <th className="p-4 font-medium text-gray-600">Role</th>
                     <th className="p-4 font-medium text-gray-600">Branch</th>
@@ -428,6 +445,7 @@ export default function Admin() {
                 <tbody className="divide-y divide-gray-100">
                   {users.map((user) => (
                     <tr key={user.uid} className="hover:bg-gray-50">
+                      <td className="p-4 text-gray-900 font-medium">{user.displayName || '-'}</td>
                       <td className="p-4 text-gray-900">{user.email}</td>
                       <td className="p-4">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium
@@ -497,6 +515,16 @@ export default function Admin() {
               </button>
             </div>
             <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
+                <input
+                  type="text"
+                  required
+                  className="w-full p-2 border border-gray-200 rounded-lg"
+                  value={editDisplayName}
+                  onChange={e => setEditDisplayName(e.target.value)}
+                />
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input

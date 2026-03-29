@@ -381,7 +381,7 @@ export default function Dashboard() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-500">Welcome back, {userProfile?.displayName}</p>
+          <p className="text-gray-500">Welcome back, {userProfile?.displayName || userProfile?.email}</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-gray-100">

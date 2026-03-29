@@ -203,9 +203,9 @@ async function startServer() {
 
   // API Route to create user in Auth (Admin only)
   app.post("/api/admin/create-user", async (req, res) => {
-    const { email, password, role, branchId, customId, adminToken } = req.body;
+    const { email, password, role, branchId, customId, displayName, adminToken } = req.body;
 
-    if (!email || !password || !role || !branchId || !customId || !adminToken) {
+    if (!email || !password || !role || !branchId || !customId || !displayName || !adminToken) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -222,7 +222,7 @@ async function startServer() {
       const userRecord = await admin.auth().createUser({
         email,
         password,
-        displayName: email.split('@')[0],
+        displayName: displayName,
       });
 
       // 3. Create user profile in Firestore
@@ -230,6 +230,7 @@ async function startServer() {
         uid: userRecord.uid,
         customId,
         email,
+        displayName,
         role,
         branchId,
         isAuthUser: true,
