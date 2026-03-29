@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, getDocs, addDoc, serverTimestamp, where } from 'firebase/firestore';
-import { UserProfile, Role } from '@/types';
+import { UserProfile, Role, Staff } from '@/types';
 import { useBranches } from '@/hooks/useBranches';
 import { useAuth } from '@/context/AuthContext';
 import { Plus, Search, User, X, Download, Printer } from 'lucide-react';
@@ -15,7 +15,7 @@ export default function StaffList() {
   const { userProfile } = useAuth();
   const { branches: dbBranches } = useBranches();
   const navigate = useNavigate();
-  const [staff, setStaff] = useState<UserProfile[]>([]);
+  const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,19 +42,19 @@ export default function StaffList() {
 
   useEffect(() => {
     if (dbBranches.length > 0 && !branchId) {
-      setBranchId(dbBranches[0].name);
+      setBranchId(dbBranches[0].id);
     }
   }, [dbBranches, branchId]);
 
   const fetchStaff = async () => {
     setLoading(true);
     try {
-      let q = query(collection(db, 'users'));
+      let q = query(collection(db, 'staff'));
       if (userProfile?.role === 'Cashier' || userProfile?.role === 'Manager') {
-        q = query(collection(db, 'users'), where('branchId', '==', userProfile.branchId));
+        q = query(collection(db, 'staff'), where('branchId', '==', userProfile.branchId));
       }
       const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff));
       setStaff(data);
     } catch (error) {
       console.error("Error fetching staff:", error);
@@ -70,7 +70,7 @@ export default function StaffList() {
     try {
       // Check for duplicates
       const duplicateQuery = query(
-        collection(db, 'users'),
+        collection(db, 'staff'),
         where('email', '==', email),
         where('branchId', '==', branchId)
       );
@@ -85,7 +85,7 @@ export default function StaffList() {
 
       // In a real app, you'd trigger a cloud function to create the Auth user.
       // Here we just add the document.
-      await addDoc(collection(db, 'users'), {
+      await addDoc(collection(db, 'staff'), {
         email,
         displayName,
         role,
@@ -94,6 +94,7 @@ export default function StaffList() {
         basicSalary: parseFloat(basicSalary) || 0,
         hireDate: hireDate ? new Date(hireDate).toISOString() : null,
         createdAt: serverTimestamp(),
+        hasUserAccount: false,
       });
       
       if (userProfile) {
@@ -219,9 +220,9 @@ export default function StaffList() {
             ) : (
               paginatedStaff.map((user) => (
                 <tr 
-                  key={user.uid} 
+                  key={user.id} 
                   className="hover:bg-gray-50 cursor-pointer"
-                  onClick={() => navigate(`/staff/${user.uid}`)}
+                  onClick={() => navigate(`/staff/${user.id}`)}
                 >
                   <td className="p-4 font-medium text-gray-900 flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
@@ -238,7 +239,9 @@ export default function StaffList() {
                       {user.role}
                     </span>
                   </td>
-                  <td className="p-4 text-gray-500">{user.branchId}</td>
+                  <td className="p-4 text-gray-500">
+                    {dbBranches.find(b => b.id === user.branchId || b.name === user.branchId)?.name || user.branchId}
+                  </td>
                   <td className="p-4 text-gray-400">
                     <button className="hover:text-blue-600">View</button>
                   </td>
@@ -348,7 +351,7 @@ export default function StaffList() {
                     value={branchId}
                     onChange={e => setBranchId(e.target.value)}
                   >
-                    {dbBranches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                    {dbBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
                 </div>
               </div>

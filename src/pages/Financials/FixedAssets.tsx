@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, where } from 'firebase/firestore';
-import { FixedAsset, Branch } from '@/types';
+import { FixedAsset, BranchModel } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import { useBranches } from '@/hooks/useBranches';
 import { Plus, Search, Trash2, Edit2, Save, X, Package } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function FixedAssets() {
   const { userProfile } = useAuth();
+  const { branches: dbBranches } = useBranches();
   const [assets, setAssets] = useState<FixedAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -21,8 +23,14 @@ export default function FixedAssets() {
   const [purchasePrice, setPurchasePrice] = useState('');
   const [currentValue, setCurrentValue] = useState('');
   const [depreciationRate, setDepreciationRate] = useState('');
-  const [branchId, setBranchId] = useState<Branch>(userProfile?.branchId || 'Gyinyase');
+  const [branchId, setBranchId] = useState<string>('');
   const [description, setDescription] = useState('');
+
+  useEffect(() => {
+    if (dbBranches.length > 0 && !branchId) {
+      setBranchId(userProfile?.branchId || dbBranches[0].id);
+    }
+  }, [dbBranches, userProfile, branchId]);
 
   useEffect(() => {
     fetchAssets();
@@ -112,7 +120,7 @@ export default function FixedAssets() {
     setPurchasePrice('');
     setCurrentValue('');
     setDepreciationRate('');
-    setBranchId(userProfile?.branchId || 'Gyinyase');
+    setBranchId(userProfile?.branchId || (dbBranches[0]?.id || ''));
     setDescription('');
     setEditingAsset(null);
   };
@@ -134,8 +142,6 @@ export default function FixedAssets() {
     asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     asset.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const branches: Branch[] = ['Gyinyase', 'Kasoa', 'Madina', 'Santasi'];
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -188,7 +194,9 @@ export default function FixedAssets() {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{asset.category}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{asset.branchId}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+                    {dbBranches.find(b => b.id === asset.branchId || b.name === asset.branchId)?.name || asset.branchId}
+                  </td>
                   <td className="px-6 py-4 text-sm text-gray-900 font-medium whitespace-nowrap">GH₵ {asset.purchasePrice.toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-gray-900 font-medium whitespace-nowrap">GH₵ {asset.currentValue.toLocaleString()}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -278,10 +286,10 @@ export default function FixedAssets() {
                       required
                       className="w-full p-2 border border-gray-200 rounded-lg"
                       value={branchId}
-                      onChange={e => setBranchId(e.target.value as Branch)}
+                      onChange={e => setBranchId(e.target.value)}
                     >
-                      {branches.map(b => (
-                        <option key={b} value={b}>{b}</option>
+                      {dbBranches.map(b => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
                       ))}
                     </select>
                   </div>

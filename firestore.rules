@@ -75,6 +75,20 @@ service cloud.firestore {
                     ) && isValidUser(request.resource.data);
     }
 
+    // Staff collection - Employee records
+    match /staff/{staffId} {
+      function isValidStaff(data) {
+        return data.email is string &&
+               data.displayName is string &&
+               data.role in ['Cashier', 'Manager', 'Accountant', 'Director', 'Admin'] &&
+               data.branchId in ['Gyinyase', 'Kasoa', 'Madina', 'Santasi'];
+      }
+
+      allow read: if isAccountant();
+      allow create, update: if isAdmin() && isValidStaff(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
     // Products collection
     match /products/{productId} {
       function isValidProduct(data) {

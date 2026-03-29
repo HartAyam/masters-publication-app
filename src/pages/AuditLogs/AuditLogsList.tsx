@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, limit, startAfter, getDocs, where, Timestamp } from 'firebase/firestore';
-import { ActivityLog, Role } from '@/types';
+import { ActivityLog, Role, BranchModel } from '@/types';
+import { useBranches } from '@/hooks/useBranches';
 import { Search, Eye, X, Download, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { exportToCSV, printDiv } from '@/lib/exportUtils';
@@ -10,6 +11,7 @@ import Pagination from '@/components/common/Pagination';
 const PAGE_SIZE = 20;
 
 export default function AuditLogsList() {
+  const { branches: dbBranches } = useBranches();
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastVisible, setLastVisible] = useState<any>(null);
@@ -105,7 +107,7 @@ export default function AuditLogsList() {
       Role: l.userRole,
       Action: l.action,
       Details: l.details,
-      Branch: l.branchId
+      Branch: dbBranches.find(b => b.id === l.branchId || b.name === l.branchId)?.name || l.branchId
     }));
     exportToCSV(dataToExport, `AuditLogs_${format(new Date(), 'yyyy-MM-dd')}`);
   };
@@ -203,7 +205,9 @@ export default function AuditLogsList() {
                     {log.userRole}
                   </span>
                 </td>
-                <td className="p-4 text-gray-500">{log.branchId}</td>
+                <td className="p-4 text-gray-500">
+                  {dbBranches.find(b => b.id === log.branchId || b.name === log.branchId)?.name || log.branchId}
+                </td>
                 <td className="p-4 text-gray-400">
                   <Eye size={16} />
                 </td>
@@ -262,7 +266,9 @@ export default function AuditLogsList() {
                 </div>
                 <div>
                   <div className="text-gray-500 mb-1">Branch</div>
-                  <div className="font-medium">{selectedLog.branchId}</div>
+                  <div className="font-medium">
+                    {dbBranches.find(b => b.id === selectedLog.branchId || b.name === selectedLog.branchId)?.name || selectedLog.branchId}
+                  </div>
                 </div>
               </div>
               <div>

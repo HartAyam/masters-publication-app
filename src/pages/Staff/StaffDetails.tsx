@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { UserProfile, Role, Branch, BranchModel } from '@/types';
+import { UserProfile, Role, Branch, BranchModel, Staff } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useBranches } from '@/hooks/useBranches';
 import { ArrowLeft, User, Mail, Shield, MapPin, Save, Phone, DollarSign, Calendar, Clock, Trash2 } from 'lucide-react';
@@ -14,7 +14,7 @@ export default function StaffDetails() {
   const navigate = useNavigate();
   const { userProfile } = useAuth();
   const { branches: dbBranches } = useBranches();
-  const [staff, setStaff] = useState<UserProfile | null>(null);
+  const [staff, setStaff] = useState<Staff | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -37,10 +37,10 @@ export default function StaffDetails() {
     if (!id) return;
     setLoading(true);
     try {
-      const docRef = doc(db, 'users', id);
+      const docRef = doc(db, 'staff', id);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
-        const data = { uid: docSnap.id, ...docSnap.data() } as UserProfile;
+        const data = { id: docSnap.id, ...docSnap.data() } as Staff;
         setStaff(data);
         setDisplayName(data.displayName || '');
         setRole(data.role);
@@ -64,7 +64,7 @@ export default function StaffDetails() {
     if (!id || !canEdit) return;
     setLoading(true);
     try {
-      await updateDoc(doc(db, 'users', id), {
+      await updateDoc(doc(db, 'staff', id), {
         displayName,
         role,
         branchId,
@@ -87,7 +87,7 @@ export default function StaffDetails() {
     if (!id || !canDelete) return;
     setLoading(true);
     try {
-      await deleteDoc(doc(db, 'users', id));
+      await deleteDoc(doc(db, 'staff', id));
       alert('Staff member deleted successfully');
       navigate('/staff');
     } catch (error) {

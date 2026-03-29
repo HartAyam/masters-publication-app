@@ -37,9 +37,9 @@ export default function ClientsList() {
 
   useEffect(() => {
     if (dbBranches.length > 0 && !primaryBranch) {
-      setPrimaryBranch(dbBranches[0].name);
+      setPrimaryBranch(dbBranches[0].id);
     }
-  }, [dbBranches]);
+  }, [dbBranches, primaryBranch]);
   
   // Contact Person State
   const [contactName, setContactName] = useState('');
@@ -160,7 +160,7 @@ export default function ClientsList() {
       setPhone('');
       setEmail('');
       setAddress('');
-      setPrimaryBranch(isGlobalUser(userProfile?.role || '') ? (dbBranches[0]?.name || '') : userProfile?.branchId || (dbBranches[0]?.name || ''));
+      setPrimaryBranch(isGlobalUser(userProfile?.role || '') ? (dbBranches[0]?.id || '') : userProfile?.branchId || (dbBranches[0]?.id || ''));
       setContactName('');
       setContactPhone('');
       setContactEmail('');
@@ -272,7 +272,7 @@ export default function ClientsList() {
               >
                 <option value="ALL">All Branches</option>
                 {dbBranches.map(branch => (
-                  <option key={branch.id} value={branch.name}>{branch.name}</option>
+                  <option key={branch.id} value={branch.id}>{branch.name}</option>
                 ))}
               </select>
             </div>
@@ -349,7 +349,9 @@ export default function ClientsList() {
                       <div><a href={`tel:${client.phone}`} className="hover:text-blue-600">{client.phone}</a></div>
                       {client.email && <div className="text-xs text-gray-400"><a href={`mailto:${client.email}`} className="hover:text-blue-600">{client.email}</a></div>}
                     </td>
-                    <td className="p-4 text-gray-500">{client.primaryBranch}</td>
+                    <td className="p-4 text-gray-500">
+                      {dbBranches.find(b => b.id === client.primaryBranch || b.name === client.primaryBranch)?.name || client.primaryBranch}
+                    </td>
                     <td className={`p-4 font-medium ${client.totalDebt > 0 ? 'text-red-600' : 'text-gray-900'}`}>
                       {formatCurrency(client.totalDebt)}
                     </td>
@@ -503,7 +505,7 @@ export default function ClientsList() {
                     value={primaryBranch}
                     onChange={e => setPrimaryBranch(e.target.value)}
                   >
-                    {dbBranches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                    {dbBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
                 </div>
               )}

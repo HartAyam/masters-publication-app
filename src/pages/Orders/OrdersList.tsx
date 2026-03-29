@@ -187,7 +187,7 @@ export default function OrdersList() {
               >
                 <option value="ALL">All Branches</option>
                 {dbBranches.map(branch => (
-                  <option key={branch.id} value={branch.name}>{branch.name}</option>
+                  <option key={branch.id} value={branch.id}>{branch.name}</option>
                 ))}
               </select>
             </div>
@@ -314,7 +314,9 @@ export default function OrdersList() {
                       </span>
                     </td>
                     {isGlobalUser(userProfile?.role || '') && (
-                      <td className="p-4 text-sm text-gray-500">{order.branchId}</td>
+                      <td className="p-4 text-sm text-gray-500">
+                        {dbBranches.find(b => b.id === order.branchId || b.name === order.branchId)?.name || order.branchId}
+                      </td>
                     )}
                     <td className="p-4 text-gray-400">
                       <ChevronRight size={20} />

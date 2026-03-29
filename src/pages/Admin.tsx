@@ -17,7 +17,6 @@ export default function Admin() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState(ROLES[0]);
   const [branch, setBranch] = useState('');
-  const [selectedStaffId, setSelectedStaffId] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   
@@ -52,7 +51,7 @@ export default function Admin() {
 
   useEffect(() => {
     if (dbBranches.length > 0 && !branch) {
-      setBranch(dbBranches[0].name);
+      setBranch(dbBranches[0].id);
     }
   }, [dbBranches, branch]);
 
@@ -101,9 +100,8 @@ export default function Admin() {
           email,
           password,
           role,
-          branchId: isGlobalUser(role) ? 'Gyinyase' : branch,
+          branchId: branch,
           customId,
-          staffId: selectedStaffId,
           adminToken: idToken
         })
       });
@@ -114,7 +112,6 @@ export default function Admin() {
       setMessage(`User ${email} created successfully with ID: ${customId}`);
       setEmail('');
       setPassword('');
-      setSelectedStaffId('');
       fetchUsers();
     } catch (error: any) {
       console.error(error);
@@ -334,38 +331,13 @@ export default function Admin() {
             
             <form onSubmit={handleCreateUser} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Select Staff Member</label>
-              <select
-                required
-                className="w-full p-2 border border-gray-200 rounded-lg"
-                value={selectedStaffId}
-                onChange={(e) => {
-                  const staffId = e.target.value;
-                  setSelectedStaffId(staffId);
-                  const staff = users.find(u => u.uid === staffId);
-                  if (staff) {
-                    setEmail(staff.email);
-                    setRole(staff.role);
-                    setBranch(staff.branchId);
-                  }
-                }}
-              >
-                <option value="">-- Select Staff --</option>
-                {users.filter(u => !(u as any).isAuthUser).map(u => (
-                  <option key={u.uid} value={u.uid}>
-                    {u.displayName || u.email} ({u.email})
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">Only staff members without user accounts are listed.</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email (from staff)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <input
                 type="email"
-                readOnly
-                className="w-full p-2 border border-gray-200 rounded-lg bg-gray-50"
+                required
+                className="w-full p-2 border border-gray-200 rounded-lg"
                 value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div>
@@ -395,13 +367,9 @@ export default function Admin() {
                   className="w-full p-2 border border-gray-200 rounded-lg"
                   value={branch}
                   onChange={(e) => setBranch(e.target.value)}
-                  disabled={isGlobalUser(role)}
                 >
-                  {dbBranches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                  {dbBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
-                {isGlobalUser(role) && (
-                  <p className="text-xs text-gray-500 mt-1">Headquarters (Gyinyase)</p>
-                )}
               </div>
             </div>
             <button
@@ -469,7 +437,9 @@ export default function Admin() {
                           {user.role}
                         </span>
                       </td>
-                      <td className="p-4 text-gray-500">{user.branchId}</td>
+                      <td className="p-4 text-gray-500">
+                        {dbBranches.find(b => b.id === user.branchId || b.name === user.branchId)?.name || user.branchId}
+                      </td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
                           <button 
@@ -556,7 +526,7 @@ export default function Admin() {
                     onChange={e => setEditBranch(e.target.value as any)}
                     disabled={isGlobalUser(editRole)}
                   >
-                    {dbBranches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                    {dbBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
                 </div>
               </div>

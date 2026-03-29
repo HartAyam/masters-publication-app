@@ -29,9 +29,9 @@ export default function Expenses() {
   
   useEffect(() => {
     if (dbBranches.length > 0 && !branchId) {
-      setBranchId(dbBranches[0].name);
+      setBranchId(dbBranches[0].id);
     }
-  }, [dbBranches]);
+  }, [dbBranches, branchId]);
   
   // Ledger State
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -218,7 +218,7 @@ export default function Expenses() {
           >
             <option value="ALL">All Branches</option>
             {dbBranches.map(b => (
-              <option key={b.id} value={b.name}>{b.name}</option>
+              <option key={b.id} value={b.id}>{b.name}</option>
             ))}
           </select>
         )}
@@ -277,7 +277,7 @@ export default function Expenses() {
                     required
                   >
                     {dbBranches.map(b => (
-                      <option key={b.id} value={b.name}>{b.name}</option>
+                      <option key={b.id} value={b.id}>{b.name}</option>
                     ))}
                   </select>
                 </div>
@@ -368,7 +368,9 @@ export default function Expenses() {
                       <span className="px-2 py-1 bg-gray-100 rounded-full text-xs">{expense.category}</span>
                     </td>
                     <td className="p-4 text-gray-500 truncate max-w-xs">{expense.description}</td>
-                    <td className="p-4 text-gray-500">{expense.branchId}</td>
+                    <td className="p-4 text-gray-500">
+                      {dbBranches.find(b => b.id === expense.branchId || b.name === expense.branchId)?.name || expense.branchId}
+                    </td>
                     <td className="p-4 font-bold text-gray-900">{formatCurrency(expense.amount)}</td>
                     <td className="p-4 text-gray-500">{expense.approverName}</td>
                   </tr>
@@ -446,7 +448,9 @@ export default function Expenses() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Branch</p>
-                  <p className="font-bold text-gray-900">{selectedExpense.branchId}</p>
+                  <p className="font-bold text-gray-900">
+                    {dbBranches.find(b => b.id === selectedExpense.branchId || b.name === selectedExpense.branchId)?.name || selectedExpense.branchId}
+                  </p>
                 </div>
               </div>
 

@@ -9,9 +9,20 @@ export interface UserProfile {
   role: Role;
   branchId: Branch;
   phone?: string;
-  basicSalary?: number;
-  hireDate?: any; // Firestore Timestamp or ISO string
   createdAt: any; // Firestore Timestamp
+}
+
+export interface Staff {
+  id: string;
+  email: string;
+  displayName: string;
+  role: Role;
+  branchId: Branch;
+  phone: string;
+  basicSalary: number;
+  hireDate: any; // Firestore Timestamp or ISO string
+  createdAt: any; // Firestore Timestamp
+  hasUserAccount?: boolean;
 }
 
 export interface Product {

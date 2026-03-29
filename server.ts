@@ -225,18 +225,6 @@ async function startServer() {
         displayName: email.split('@')[0],
       });
 
-      // 2. If an existing staff ID was provided, get its data and then delete it
-      // to avoid duplicates when we create the new user document with the Auth UID
-      const { staffId } = req.body;
-      if (staffId) {
-        try {
-          await db.collection("users").doc(staffId).delete();
-          console.log(`Deleted existing staff document: ${staffId}`);
-        } catch (e) {
-          console.error(`Failed to delete staff document ${staffId}:`, e);
-        }
-      }
-
       // 3. Create user profile in Firestore
       await db.collection("users").doc(userRecord.uid).set({
         uid: userRecord.uid,

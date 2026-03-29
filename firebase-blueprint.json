@@ -14,6 +14,23 @@
       },
       "required": ["uid", "email", "role", "branchId"]
     },
+    "Staff": {
+      "title": "Staff",
+      "description": "Employee records.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["Cashier", "Manager", "Accountant", "Director", "Admin"] },
+        "branchId": { "type": "string", "enum": ["Gyinyase", "Kasoa", "Madina", "Santasi"] },
+        "phone": { "type": "string" },
+        "basicSalary": { "type": "number" },
+        "hireDate": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "hasUserAccount": { "type": "boolean" }
+      },
+      "required": ["email", "displayName", "role", "branchId"]
+    },
     "Product": {
       "title": "Product",
       "description": "Inventory items.",
@@ -32,6 +49,10 @@
     "/users/{userId}": {
       "schema": "UserProfile",
       "description": "User profiles collection."
+    },
+    "/staff/{staffId}": {
+      "schema": "Staff",
+      "description": "Employee records collection."
     },
     "/products/{productId}": {
       "schema": "Product",

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useBranches } from '@/hooks/useBranches';
 import { 
   LayoutDashboard, 
   ShoppingCart, 
@@ -24,6 +25,7 @@ import { cn } from '@/lib/utils';
 
 export const Sidebar = () => {
   const { userProfile, logout } = useAuth();
+  const { branches } = useBranches();
   const location = useLocation();
   const [isOpen, setIsOpen] = React.useState(false); // Mobile drawer
   const [isCollapsed, setIsCollapsed] = React.useState(false); // Desktop collapse
@@ -32,6 +34,10 @@ export const Sidebar = () => {
   const toggleDesktopSidebar = () => setIsCollapsed(!isCollapsed);
 
   if (!userProfile) return null;
+
+  // Find branch name from ID if necessary
+  const currentBranch = branches.find(b => b.id === userProfile.branchId || b.name === userProfile.branchId);
+  const branchName = currentBranch ? currentBranch.name : userProfile.branchId;
 
   const links = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['Cashier', 'Manager', 'Accountant', 'Director', 'Admin'] },
@@ -96,7 +102,7 @@ export const Sidebar = () => {
               />
               <div>
                 <h1 className="text-xl font-bold leading-tight whitespace-nowrap">Masters<br/>Publications</h1>
-                <p className="text-[10px] text-gray-400 mt-1">{userProfile.branchId} Branch</p>
+                <p className="text-[10px] text-gray-400 mt-1">{branchName} Branch</p>
               </div>
             </div>
           )}

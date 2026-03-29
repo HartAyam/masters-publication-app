@@ -77,9 +77,17 @@ export default function POS() {
       setStaff(staffSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() as any } as UserProfile)));
 
       // Branch Info
-      if (!isGlobal) {
-        const branchQ = query(collection(db, 'branches'), where('name', '==', userProfile.branchId));
-        const branchSnapshot = await getDocs(branchQ);
+      if (!isGlobal && userProfile.branchId) {
+        // Try to find by ID first
+        const branchQ = query(collection(db, 'branches'), where('id', '==', userProfile.branchId));
+        let branchSnapshot = await getDocs(branchQ);
+        
+        if (branchSnapshot.empty) {
+          // Fallback for legacy data where branchId might be the name
+          const branchNameQ = query(collection(db, 'branches'), where('name', '==', userProfile.branchId));
+          branchSnapshot = await getDocs(branchNameQ);
+        }
+
         if (!branchSnapshot.empty) {
           setCurrentBranch({ id: branchSnapshot.docs[0].id, ...branchSnapshot.docs[0].data() as any } as BranchModel);
         }

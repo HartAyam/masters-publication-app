@@ -172,7 +172,7 @@ export default function FinancialStatements() {
       setReportData({
         periodLabel: `${format(start, 'MMM dd, yyyy')} - ${format(end, 'MMM dd, yyyy')}`,
         endDateLabel: format(end, 'MMM dd, yyyy'),
-        branchLabel: selectedBranch === 'All' ? 'All Branches' : selectedBranch,
+        branchLabel: selectedBranch === 'All' ? 'All Branches' : (dbBranches.find(b => b.id === selectedBranch || b.name === selectedBranch)?.name || selectedBranch),
         totalRevenue,
         totalCashSales,
         totalCreditSales,
@@ -294,7 +294,7 @@ export default function FinancialStatements() {
               >
                 <option value="All">All Branches</option>
                 {dbBranches.map(b => (
-                  <option key={b.id} value={b.name}>{b.name}</option>
+                  <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
             </div>

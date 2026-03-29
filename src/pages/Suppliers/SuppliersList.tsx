@@ -36,9 +36,9 @@ export default function SuppliersList() {
 
   useEffect(() => {
     if (dbBranches.length > 0 && !primaryBranch) {
-      setPrimaryBranch(dbBranches[0].name);
+      setPrimaryBranch(dbBranches[0].id);
     }
-  }, [dbBranches]);
+  }, [dbBranches, primaryBranch]);
   
   // Contact Person State
   const [contactName, setContactName] = useState('');
@@ -158,7 +158,7 @@ export default function SuppliersList() {
       setPhone('');
       setEmail('');
       setAddress('');
-      setPrimaryBranch(isGlobalUser(userProfile?.role || '') ? (dbBranches[0]?.name || '') : userProfile?.branchId || (dbBranches[0]?.name || ''));
+      setPrimaryBranch(isGlobalUser(userProfile?.role || '') ? (dbBranches[0]?.id || '') : userProfile?.branchId || (dbBranches[0]?.id || ''));
       setContactName('');
       setContactPhone('');
       setContactEmail('');
@@ -269,7 +269,7 @@ export default function SuppliersList() {
               >
                 <option value="ALL">All Branches</option>
                 {dbBranches.map(branch => (
-                  <option key={branch.id} value={branch.name}>{branch.name}</option>
+                  <option key={branch.id} value={branch.id}>{branch.name}</option>
                 ))}
               </select>
             </div>
@@ -345,7 +345,9 @@ export default function SuppliersList() {
                       <div><a href={`tel:${supplier.phone}`} className="hover:text-blue-600">{supplier.phone}</a></div>
                       {supplier.email && <div className="text-xs text-gray-400"><a href={`mailto:${supplier.email}`} className="hover:text-blue-600">{supplier.email}</a></div>}
                     </td>
-                    <td className="p-4 text-gray-500">{supplier.primaryBranch}</td>
+                    <td className="p-4 text-gray-500">
+                      {dbBranches.find(b => b.id === supplier.primaryBranch || b.name === supplier.primaryBranch)?.name || supplier.primaryBranch}
+                    </td>
                     <td className="p-4" onClick={(e) => e.stopPropagation()}>
                       <button 
                         onClick={() => openModal(supplier)}
@@ -496,7 +498,7 @@ export default function SuppliersList() {
                     value={primaryBranch}
                     onChange={e => setPrimaryBranch(e.target.value)}
                   >
-                    {dbBranches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                    {dbBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
                 </div>
               )}

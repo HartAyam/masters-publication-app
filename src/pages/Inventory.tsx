@@ -41,9 +41,9 @@ export default function Inventory() {
 
   useEffect(() => {
     if (dbBranches.length > 0 && !branchId) {
-      setBranchId(dbBranches[0].name);
+      setBranchId(dbBranches[0].id);
     }
-  }, [dbBranches]);
+  }, [dbBranches, branchId]);
 
   useEffect(() => {
     if (!userProfile) return;
@@ -295,7 +295,7 @@ export default function Inventory() {
               >
                 <option value="ALL">All Branches</option>
                 {dbBranches.map(branch => (
-                  <option key={branch.id} value={branch.name}>{branch.name}</option>
+                  <option key={branch.id} value={branch.id}>{branch.name}</option>
                 ))}
               </select>
             </div>
@@ -384,7 +384,7 @@ export default function Inventory() {
                 value={branchId}
                 onChange={(e) => setBranchId(e.target.value)}
               >
-                {dbBranches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                {dbBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             )}
 
@@ -440,7 +440,9 @@ export default function Inventory() {
                     <td className="p-4 font-medium text-gray-900">{product.name}</td>
                     <td className="p-4 text-gray-500">{product.sku}</td>
                     <td className="p-4 text-gray-500">{product.category}</td>
-                    <td className="p-4 text-gray-500">{product.branchId}</td>
+                    <td className="p-4 text-gray-500">
+                      {dbBranches.find(b => b.id === product.branchId || b.name === product.branchId)?.name || product.branchId}
+                    </td>
                     <td className={cn(
                       "p-4 font-bold",
                       product.stockLevel <= product.minStockLevel ? "text-red-600" : "text-gray-900"
