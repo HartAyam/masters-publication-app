@@ -106,12 +106,12 @@ async function startServer() {
       // Verify the admin token
       const decodedToken = await admin.auth().verifyIdToken(adminToken);
       
-      // Check if the user is actually an admin in Firestore
+      // Check if the user is actually an admin or director in Firestore
       const userDoc = await db.collection("users").doc(decodedToken.uid).get();
       const userData = userDoc.data();
 
-      if (!userData || userData.role !== "Admin") {
-        return res.status(403).json({ error: "Unauthorized. Admin privileges required." });
+      if (!userData || !["Admin", "Director"].includes(userData.role)) {
+        return res.status(403).json({ error: "Unauthorized. Admin or Director privileges required." });
       }
 
       // Update the user's password
@@ -146,8 +146,8 @@ async function startServer() {
       const userDoc = await db.collection("users").doc(decodedToken.uid).get();
       const userData = userDoc.data();
 
-      if (!userData || userData.role !== "Admin") {
-        return res.status(403).json({ error: "Unauthorized. Admin privileges required." });
+      if (!userData || !["Admin", "Director"].includes(userData.role)) {
+        return res.status(403).json({ error: "Unauthorized. Admin or Director privileges required." });
       }
 
       // Update the user's email in Auth
@@ -181,8 +181,8 @@ async function startServer() {
       const userDoc = await db.collection("users").doc(decodedToken.uid).get();
       const userData = userDoc.data();
 
-      if (!userData || userData.role !== "Admin") {
-        return res.status(403).json({ error: "Unauthorized. Admin privileges required." });
+      if (!userData || !["Admin", "Director"].includes(userData.role)) {
+        return res.status(403).json({ error: "Unauthorized. Admin or Director privileges required." });
       }
 
       // Delete the user from Auth
@@ -214,8 +214,8 @@ async function startServer() {
       const userDoc = await db.collection("users").doc(decodedToken.uid).get();
       const userData = userDoc.data();
 
-      if (!userData || userData.role !== "Admin") {
-        return res.status(403).json({ error: "Unauthorized. Admin privileges required." });
+      if (!userData || !["Admin", "Director"].includes(userData.role)) {
+        return res.status(403).json({ error: "Unauthorized. Admin or Director privileges required." });
       }
 
       // 1. Create user in Auth
@@ -225,13 +225,26 @@ async function startServer() {
         displayName: email.split('@')[0],
       });
 
-      // 2. Create user profile in Firestore
+      // 2. If an existing staff ID was provided, get its data and then delete it
+      // to avoid duplicates when we create the new user document with the Auth UID
+      const { staffId } = req.body;
+      if (staffId) {
+        try {
+          await db.collection("users").doc(staffId).delete();
+          console.log(`Deleted existing staff document: ${staffId}`);
+        } catch (e) {
+          console.error(`Failed to delete staff document ${staffId}:`, e);
+        }
+      }
+
+      // 3. Create user profile in Firestore
       await db.collection("users").doc(userRecord.uid).set({
         uid: userRecord.uid,
         customId,
         email,
         role,
         branchId,
+        isAuthUser: true,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 

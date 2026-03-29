@@ -17,6 +17,7 @@ export default function Admin() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState(ROLES[0]);
   const [branch, setBranch] = useState('');
+  const [selectedStaffId, setSelectedStaffId] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   
@@ -102,6 +103,7 @@ export default function Admin() {
           role,
           branchId: isGlobalUser(role) ? 'Gyinyase' : branch,
           customId,
+          staffId: selectedStaffId,
           adminToken: idToken
         })
       });
@@ -112,6 +114,7 @@ export default function Admin() {
       setMessage(`User ${email} created successfully with ID: ${customId}`);
       setEmail('');
       setPassword('');
+      setSelectedStaffId('');
       fetchUsers();
     } catch (error: any) {
       console.error(error);
@@ -331,13 +334,38 @@ export default function Admin() {
             
             <form onSubmit={handleCreateUser} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input
-                type="email"
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Staff Member</label>
+              <select
                 required
                 className="w-full p-2 border border-gray-200 rounded-lg"
+                value={selectedStaffId}
+                onChange={(e) => {
+                  const staffId = e.target.value;
+                  setSelectedStaffId(staffId);
+                  const staff = users.find(u => u.uid === staffId);
+                  if (staff) {
+                    setEmail(staff.email);
+                    setRole(staff.role);
+                    setBranch(staff.branchId);
+                  }
+                }}
+              >
+                <option value="">-- Select Staff --</option>
+                {users.filter(u => !(u as any).isAuthUser).map(u => (
+                  <option key={u.uid} value={u.uid}>
+                    {u.displayName || u.email} ({u.email})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Only staff members without user accounts are listed.</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email (from staff)</label>
+              <input
+                type="email"
+                readOnly
+                className="w-full p-2 border border-gray-200 rounded-lg bg-gray-50"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div>
