@@ -141,7 +141,9 @@ export default function Inventory() {
           `Product ${name} (SKU: ${sku}) added to inventory.`,
           userProfile.uid,
           userProfile.role,
-          userProfile.branchId
+          userProfile.branchId,
+          userProfile.displayName,
+          userProfile.email
         );
       }
 

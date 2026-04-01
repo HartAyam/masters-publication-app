@@ -8,7 +8,8 @@ export const logActivity = async (
   userId: string,
   userRole: Role,
   branchId: Branch | string,
-  userName?: string
+  displayName?: string,
+  email?: string
 ) => {
   console.log(`[AuditLog] Attempting to log: ${action} - ${details}`);
   try {
@@ -16,7 +17,8 @@ export const logActivity = async (
       action,
       details,
       userId,
-      userName: userName || 'Unknown User',
+      displayName: displayName || email || userId || 'Unknown User',
+      userEmail: email || 'N/A',
       userRole,
       branchId,
       timestamp: serverTimestamp(),

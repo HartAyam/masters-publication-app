@@ -78,18 +78,23 @@ export default function POS() {
 
       // Branch Info
       if (!isGlobal && userProfile.branchId) {
-        // Try to find by ID first
-        const branchQ = query(collection(db, 'branches'), where('id', '==', userProfile.branchId));
-        let branchSnapshot = await getDocs(branchQ);
-        
-        if (branchSnapshot.empty) {
-          // Fallback for legacy data where branchId might be the name
-          const branchNameQ = query(collection(db, 'branches'), where('name', '==', userProfile.branchId));
-          branchSnapshot = await getDocs(branchNameQ);
-        }
-
-        if (!branchSnapshot.empty) {
-          setCurrentBranch({ id: branchSnapshot.docs[0].id, ...branchSnapshot.docs[0].data() as any } as BranchModel);
+        // Try to find by document ID first
+        try {
+          const { getDoc } = await import('firebase/firestore');
+          const branchDoc = await getDoc(doc(db, 'branches', userProfile.branchId));
+          
+          if (branchDoc.exists()) {
+            setCurrentBranch({ id: branchDoc.id, ...branchDoc.data() as any } as BranchModel);
+          } else {
+            // Fallback for legacy data where branchId might be the name
+            const branchNameQ = query(collection(db, 'branches'), where('name', '==', userProfile.branchId));
+            const branchSnapshot = await getDocs(branchNameQ);
+            if (!branchSnapshot.empty) {
+              setCurrentBranch({ id: branchSnapshot.docs[0].id, ...branchSnapshot.docs[0].data() as any } as BranchModel);
+            }
+          }
+        } catch (e) {
+          console.error("Error fetching branch:", e);
         }
       }
     };
@@ -289,7 +294,8 @@ export default function POS() {
         userProfile.uid,
         userProfile.role,
         userProfile.branchId,
-        userProfile.displayName || userProfile.email
+        userProfile.displayName,
+        userProfile.email
       );
 
       // 4. Update Stock

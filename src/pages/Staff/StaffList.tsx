@@ -103,7 +103,9 @@ export default function StaffList() {
           `Added new staff member: ${displayName} (${email}) as ${role}`,
           userProfile.uid,
           userProfile.role,
-          userProfile.branchId
+          userProfile.branchId,
+          userProfile.displayName,
+          userProfile.email
         );
       }
 

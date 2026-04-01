@@ -122,7 +122,9 @@ export default function BranchesList() {
           `Added new branch: ${name} at ${location}`,
           userProfile.uid,
           userProfile.role,
-          userProfile.branchId
+          userProfile.branchId,
+          userProfile.displayName,
+          userProfile.email
         );
       }
 

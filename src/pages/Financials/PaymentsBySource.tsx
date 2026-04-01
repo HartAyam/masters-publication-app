@@ -3,6 +3,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, getDocs, where, orderBy, Timestamp, writeBatch, doc } from 'firebase/firestore';
 import { Payment, Branch, Order } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import { useBranches } from '@/hooks/useBranches';
 import { Search, Filter, Calendar, ChevronRight, CreditCard, ArrowLeft, Database, Landmark, Banknote, Smartphone, HelpCircle } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -127,7 +128,7 @@ export default function PaymentsBySource() {
     detailedPayments.reduce((sum, p) => sum + p.amount, 0),
   [detailedPayments]);
 
-  const branches: (Branch | 'All')[] = ['All', 'Gyinyase', 'Kasoa', 'Madina', 'Santasi'];
+  const { branches: dbBranches } = useBranches();
 
   if (selectedMethod) {
     return (
@@ -241,8 +242,9 @@ export default function PaymentsBySource() {
               value={selectedBranch}
               onChange={(e) => setSelectedBranch(e.target.value as Branch | 'All')}
             >
-              {branches.map(b => (
-                <option key={b} value={b}>{b}</option>
+              <option value="All">All Branches</option>
+              {dbBranches.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
           </div>

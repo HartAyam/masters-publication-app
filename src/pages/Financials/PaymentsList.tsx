@@ -157,7 +157,9 @@ export default function PaymentsList() {
         `Payment of ${formatCurrency(paymentAmount)} received from ${selectedCustomer.name}. Method: ${paymentMethod}`,
         userProfile.uid,
         userProfile.role,
-        userProfile.branchId
+        userProfile.branchId,
+        userProfile.displayName,
+        userProfile.email
       );
 
       setShowAddModal(false);

@@ -1,6 +1,6 @@
 export type Role = 'Cashier' | 'Manager' | 'Accountant' | 'Director' | 'Admin';
 
-export type Branch = 'Gyinyase' | 'Kasoa' | 'Madina' | 'Santasi';
+export type Branch = string;
 
 export interface UserProfile {
   uid: string;
@@ -148,7 +148,8 @@ export interface ActivityLog {
   action: string;
   details: string;
   userId: string;
-  userName?: string;
+  displayName?: string;
+  userEmail?: string;
   userRole: Role;
   branchId: Branch;
   timestamp: any;

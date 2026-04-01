@@ -135,7 +135,9 @@ export default function PayrollList() {
           `Added payroll for ${employeeName} (${selectedMonth}). Net: ${formatCurrency(net)}`,
           userProfile.uid,
           userProfile.role,
-          userProfile.branchId
+          userProfile.branchId,
+          userProfile.displayName,
+          userProfile.email
         );
       }
 
@@ -168,7 +170,9 @@ export default function PayrollList() {
           `Updated payroll status to ${newStatus} for record ${id}`,
           userProfile.uid,
           userProfile.role,
-          userProfile.branchId
+          userProfile.branchId,
+          userProfile.displayName,
+          userProfile.email
         );
       }
 
@@ -209,7 +213,9 @@ export default function PayrollList() {
           `Updated payroll for ${selectedPayroll.employeeName} (${selectedPayroll.month}). Net: ${formatCurrency(net)}`,
           userProfile.uid,
           userProfile.role,
-          userProfile.branchId
+          userProfile.branchId,
+          userProfile.displayName,
+          userProfile.email
         );
       }
 

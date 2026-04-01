@@ -121,7 +121,9 @@ export default function Expenses() {
         `${formatCurrency(parseFloat(amount))} for ${category} by ${userProfile.email}`,
         userProfile.uid,
         userProfile.role,
-        isGlobalUser(userProfile.role) ? branchId : userProfile.branchId
+        isGlobalUser(userProfile.role) ? branchId : userProfile.branchId,
+        userProfile.displayName,
+        userProfile.email
       );
 
       setShowAddModal(false);

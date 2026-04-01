@@ -103,7 +103,7 @@ export default function Admin() {
           password,
           displayName,
           role,
-          branchId: branch,
+          branchId: isGlobalUser(role) ? 'ALL' : branch,
           customId,
           adminToken: idToken
         })
@@ -160,7 +160,7 @@ export default function Admin() {
         email: editEmail,
         displayName: editDisplayName,
         role: editRole,
-        branchId: isGlobalUser(editRole) ? 'Gyinyase' : editBranch,
+        branchId: isGlobalUser(editRole) ? 'ALL' : editBranch,
       });
 
       setFeedback({ type: 'success', message: 'User updated successfully in both Auth and Database.' });

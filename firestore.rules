@@ -62,7 +62,7 @@ service cloud.firestore {
         return data.uid is string &&
                data.email is string &&
                data.role in ['Cashier', 'Manager', 'Accountant', 'Director', 'Admin'] &&
-               data.branchId in ['Gyinyase', 'Kasoa', 'Madina', 'Santasi', 'ALL'];
+               data.branchId is string;
       }
 
       allow read: if isAuthenticated() && (isOwner(userId) || isAccountant());
@@ -81,7 +81,7 @@ service cloud.firestore {
         return data.email is string &&
                data.displayName is string &&
                data.role in ['Cashier', 'Manager', 'Accountant', 'Director', 'Admin'] &&
-               data.branchId in ['Gyinyase', 'Kasoa', 'Madina', 'Santasi'];
+               data.branchId is string;
       }
 
       allow read: if isAccountant();
@@ -95,7 +95,7 @@ service cloud.firestore {
         return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
                data.price is number && data.price >= 0 &&
                data.stockLevel is number &&
-               data.branchId in ['Gyinyase', 'Kasoa', 'Madina', 'Santasi', 'ALL'];
+               data.branchId is string;
       }
 
       allow read: if isAuthenticated();
@@ -145,6 +145,12 @@ service cloud.firestore {
     match /suppliers/{supplierId} {
       allow read: if isAuthenticated();
       allow create, update: if isManager();
+    }
+    
+    // Branches collection
+    match /branches/{branchId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
     }
     
     // Default deny

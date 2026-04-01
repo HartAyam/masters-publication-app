@@ -13,6 +13,7 @@ const PAGE_SIZE = 20;
 export default function AuditLogsList() {
   const { branches: dbBranches } = useBranches();
   const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [usersMap, setUsersMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [lastVisible, setLastVisible] = useState<any>(null);
   const [firstVisible, setFirstVisible] = useState<any>(null); // For simplified prev/next if needed, but Firestore pagination is tricky.
@@ -31,6 +32,25 @@ export default function AuditLogsList() {
   useEffect(() => {
     fetchLogs(true);
   }, [selectedAction, selectedRole, dateFilter]); // Reset pagination on filter change
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, 'users'));
+        const mapping: Record<string, string> = {};
+        snapshot.docs.forEach(doc => {
+          const data = doc.data();
+          if (data.displayName) {
+            mapping[doc.id] = data.displayName;
+          }
+        });
+        setUsersMap(mapping);
+      } catch (error) {
+        console.error("[AuditLogs] Error fetching users for mapping:", error);
+      }
+    };
+    fetchUsers();
+  }, []);
 
   const fetchLogs = async (isReset = false) => {
     setLoading(true);
@@ -96,7 +116,11 @@ export default function AuditLogsList() {
     return (
       log.action.toLowerCase().includes(term) ||
       log.details.toLowerCase().includes(term) ||
-      log.userId.toLowerCase().includes(term)
+      log.userId.toLowerCase().includes(term) ||
+      (log.displayName && log.displayName.toLowerCase().includes(term)) ||
+      ((log as any).userName && (log as any).userName.toLowerCase().includes(term)) ||
+      (log.userEmail && log.userEmail.toLowerCase().includes(term)) ||
+      (usersMap[log.userId] && usersMap[log.userId].toLowerCase().includes(term))
     );
   });
 
@@ -199,7 +223,9 @@ export default function AuditLogsList() {
                   {log.timestamp?.toDate ? format(log.timestamp.toDate(), 'PP pp') : 'N/A'}
                 </td>
                 <td className="p-4 font-medium text-gray-900">{log.action}</td>
-                <td className="p-4 text-gray-500">{log.userName || log.userId}</td>
+                <td className="p-4 text-gray-500">
+                  {log.displayName || (log as any).userName || usersMap[log.userId] || log.userEmail || log.userId || 'Unknown User'}
+                </td>
                 <td className="p-4">
                   <span className="px-2 py-1 bg-gray-100 rounded-full text-xs font-medium">
                     {log.userRole}
@@ -207,6 +233,9 @@ export default function AuditLogsList() {
                 </td>
                 <td className="p-4 text-gray-500">
                   {dbBranches.find(b => b.id === log.branchId || b.name === log.branchId)?.name || log.branchId}
+                </td>
+                <td className="p-4 text-gray-500 truncate max-w-xs">
+                  {log.details}
                 </td>
                 <td className="p-4 text-gray-400">
                   <Eye size={16} />
@@ -254,7 +283,11 @@ export default function AuditLogsList() {
                 </div>
                 <div>
                   <div className="text-gray-500 mb-1">User Name</div>
-                  <div className="font-medium">{selectedLog.userName || 'N/A'}</div>
+                  <div className="font-medium">{selectedLog.displayName || (selectedLog as any).userName || usersMap[selectedLog.userId] || 'N/A'}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 mb-1">User Email</div>
+                  <div className="font-medium">{selectedLog.userEmail || 'N/A'}</div>
                 </div>
                 <div>
                   <div className="text-gray-500 mb-1">User ID</div>

@@ -161,7 +161,9 @@ export default function OrderDetails() {
           `Order ${order.id} adjusted. New Total: ${formatCurrency(newTotalAmount)}`,
           userProfile.uid,
           userProfile.role,
-          userProfile.branchId
+          userProfile.branchId,
+          userProfile.displayName,
+          userProfile.email
         );
       }
 
@@ -245,7 +247,9 @@ export default function OrderDetails() {
           `Order ${order.id} ${returnType === 'Full' ? 'fully' : 'partially'} returned. Amount: ${formatCurrency(returnTotal)}`,
           userProfile.uid,
           userProfile.role,
-          userProfile.branchId
+          userProfile.branchId,
+          userProfile.displayName,
+          userProfile.email
         );
       }
 
@@ -336,7 +340,9 @@ export default function OrderDetails() {
           `Order ${order.id} ${isFullySupplied ? 'fully' : 'partially'} supplied by ${suppliedByStaff}`,
           userProfile.uid,
           userProfile.role,
-          userProfile.branchId
+          userProfile.branchId,
+          userProfile.displayName,
+          userProfile.email
         );
       }
 

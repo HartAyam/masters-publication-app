@@ -45,6 +45,7 @@ export default function Dashboard() {
   const { branches: dbBranches } = useBranches();
   const [loading, setLoading] = useState(true);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
+  const [usersMap, setUsersMap] = useState<Record<string, string>>({});
   const [recentPayments, setRecentPayments] = useState<Payment[]>([]);
   const [recentExpenses, setRecentExpenses] = useState<Expense[]>([]);
   const [activityCurrentPage, setActivityCurrentPage] = useState(1);
@@ -288,7 +289,20 @@ export default function Dashboard() {
       const q = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(100));
       const fetchActivities = async () => {
         try {
-          const snap = await getDocs(q);
+          const [snap, usersSnap] = await Promise.all([
+            getDocs(q),
+            getDocs(collection(db, 'users'))
+          ]);
+
+          const mapping: Record<string, string> = {};
+          usersSnap.docs.forEach(doc => {
+            const data = doc.data();
+            if (data.displayName) {
+              mapping[doc.id] = data.displayName;
+            }
+          });
+          setUsersMap(mapping);
+
           let acts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ActivityLog));
           if (selectedBranch !== 'ALL') {
             acts = acts.filter(a => a.branchId === selectedBranch);
@@ -877,23 +891,27 @@ export default function Dashboard() {
               <table className="w-full text-left text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    <th className="p-4 font-medium text-gray-600">Date</th>
-                    <th className="p-4 font-medium text-gray-600">Action</th>
-                    <th className="p-4 font-medium text-gray-600">Details</th>
-                    <th className="p-4 font-medium text-gray-600">User Role</th>
-                    <th className="p-4 font-medium text-gray-600">Branch</th>
+                    <th className="p-4 font-medium text-gray-600 text-left">Date</th>
+                    <th className="p-4 font-medium text-gray-600 text-left">User</th>
+                    <th className="p-4 font-medium text-gray-600 text-left">Action</th>
+                    <th className="p-4 font-medium text-gray-600 text-left">Details</th>
+                    <th className="p-4 font-medium text-gray-600 text-left">User Role</th>
+                    <th className="p-4 font-medium text-gray-600 text-left">Branch</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {paginatedActivities.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="p-8 text-center text-gray-500">No recent activity found</td>
+                      <td colSpan={6} className="p-8 text-center text-gray-500">No recent activity found</td>
                     </tr>
                   ) : (
                     paginatedActivities.map((activity) => (
                       <tr key={activity.id} className="hover:bg-gray-50">
                         <td className="p-4 text-gray-500 whitespace-nowrap">
                           {activity.timestamp?.toDate ? format(activity.timestamp.toDate(), 'MMM dd, HH:mm') : 'N/A'}
+                        </td>
+                        <td className="p-4 text-gray-900 font-medium">
+                          {activity.displayName || (activity as any).userName || usersMap[activity.userId] || activity.userId}
                         </td>
                         <td className="p-4">
                           <span className="text-xs font-bold text-purple-600 uppercase tracking-wider bg-purple-50 px-2 py-1 rounded-md">
@@ -906,7 +924,9 @@ export default function Dashboard() {
                             {activity.userRole}
                           </span>
                         </td>
-                        <td className="p-4 text-gray-500">{activity.branchId}</td>
+                        <td className="p-4 text-gray-500">
+                          {dbBranches.find(b => b.id === activity.branchId || b.name === activity.branchId)?.name || activity.branchId}
+                        </td>
                       </tr>
                     ))
                   )}

@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
 
 export const Sidebar = () => {
   const { userProfile, logout } = useAuth();
-  const { branches } = useBranches();
+  const { branches, loading: branchesLoading } = useBranches();
   const location = useLocation();
   const [isOpen, setIsOpen] = React.useState(false); // Mobile drawer
   const [isCollapsed, setIsCollapsed] = React.useState(false); // Desktop collapse
@@ -37,7 +37,7 @@ export const Sidebar = () => {
 
   // Find branch name from ID if necessary
   const currentBranch = branches.find(b => b.id === userProfile.branchId || b.name === userProfile.branchId);
-  const branchName = currentBranch ? currentBranch.name : userProfile.branchId;
+  const branchName = branchesLoading ? 'Loading...' : (userProfile.branchId === 'ALL' ? 'All Branches' : (currentBranch ? currentBranch.name : userProfile.branchId));
 
   const links = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['Cashier', 'Manager', 'Accountant', 'Director', 'Admin'] },
@@ -102,7 +102,9 @@ export const Sidebar = () => {
               />
               <div>
                 <h1 className="text-xl font-bold leading-tight whitespace-nowrap">Masters<br/>Publications</h1>
-                <p className="text-[10px] text-gray-400 mt-1">{branchName} Branch</p>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  {branchName === 'All Branches' || branchName === 'Loading...' ? branchName : `${branchName} Branch`}
+                </p>
               </div>
             </div>
           )}
