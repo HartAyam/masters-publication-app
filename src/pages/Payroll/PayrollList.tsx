@@ -31,6 +31,8 @@ export default function PayrollList() {
   // Form State
   const [employeeName, setEmployeeName] = useState('');
   const [employeeId, setEmployeeId] = useState('');
+  const [ssnNo, setSsnNo] = useState('');
+  const [ghanaCardNo, setGhanaCardNo] = useState('');
   const [basicSalary, setBasicSalary] = useState('');
   const [ssnit, setSsnit] = useState('0');
   const [paye, setPaye] = useState('0');
@@ -56,7 +58,7 @@ export default function PayrollList() {
 
   const fetchStaff = async () => {
     try {
-      const q = query(collection(db, 'users'));
+      const q = query(collection(db, 'staff'));
       const snapshot = await getDocs(q);
       setStaff(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (error) {
@@ -117,6 +119,8 @@ export default function PayrollList() {
       await addDoc(collection(db, 'payroll'), {
         employeeName,
         employeeId,
+        ssnNo,
+        ghanaCardNo,
         month: selectedMonth,
         basicSalary: basic,
         ssnit: ssnitVal,
@@ -144,6 +148,8 @@ export default function PayrollList() {
       setShowModal(false);
       setEmployeeName('');
       setEmployeeId('');
+      setSsnNo('');
+      setGhanaCardNo('');
       setBasicSalary('');
       setSsnit('0');
       setPaye('0');
@@ -205,6 +211,8 @@ export default function PayrollList() {
         otherDeductions: otherDeduct,
         bonuses: bonusVal,
         netSalary: net,
+        ssnNo,
+        ghanaCardNo,
       });
 
       if (userProfile) {
@@ -228,6 +236,8 @@ export default function PayrollList() {
         otherDeductions: otherDeduct,
         bonuses: bonusVal,
         netSalary: net,
+        ssnNo,
+        ghanaCardNo,
       });
       fetchPayrolls();
     } catch (error) {
@@ -254,6 +264,8 @@ export default function PayrollList() {
     setSelectedPayroll(payroll);
     setEmployeeName(payroll.employeeName);
     setEmployeeId(payroll.employeeId);
+    setSsnNo(payroll.ssnNo || '');
+    setGhanaCardNo(payroll.ghanaCardNo || '');
     setBasicSalary(payroll.basicSalary.toString());
     setSsnit(payroll.ssnit.toString());
     setPaye(payroll.paye.toString());
@@ -346,7 +358,12 @@ export default function PayrollList() {
                   <tr key={payroll.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openDetails(payroll)}>
                     <td className="p-4 font-medium text-gray-900">
                       {payroll.employeeName}
-                      <div className="text-xs text-gray-500">{payroll.employeeId}</div>
+                      <div className="text-xs text-gray-500">
+                        {payroll.ssnNo && `SSF: ${payroll.ssnNo}`}
+                        {payroll.ssnNo && payroll.ghanaCardNo && ' | '}
+                        {payroll.ghanaCardNo && `GHA: ${payroll.ghanaCardNo}`}
+                        {!payroll.ssnNo && !payroll.ghanaCardNo && payroll.employeeId}
+                      </div>
                     </td>
                     <td className="p-4 text-gray-500">{payroll.branchId}</td>
                     <td className="p-4">{formatCurrency(payroll.basicSalary)}</td>
@@ -421,7 +438,7 @@ export default function PayrollList() {
                     {staff
                       .filter(s => 
                         s.displayName?.toLowerCase().includes(staffSearchTerm.toLowerCase()) ||
-                        s.uid?.toLowerCase().includes(staffSearchTerm.toLowerCase())
+                        s.id?.toLowerCase().includes(staffSearchTerm.toLowerCase())
                       )
                       .map(s => (
                         <button
@@ -430,14 +447,17 @@ export default function PayrollList() {
                           className="w-full text-left px-4 py-2 hover:bg-gray-50 flex flex-col"
                           onClick={() => {
                             setEmployeeName(s.displayName || 'Unnamed');
-                            setEmployeeId(s.uid || s.id);
+                            setEmployeeId(s.id);
+                            setSsnNo(s.ssnNo || '');
+                            setGhanaCardNo(s.ghanaCardNo || '');
                             setBasicSalary(s.basicSalary?.toString() || '0');
+                            setBranchId(s.branchId || '');
                             setStaffSearchTerm(s.displayName || '');
                             setShowStaffResults(false);
                           }}
                         >
                           <span className="font-medium">{s.displayName}</span>
-                          <span className="text-xs text-gray-500">ID: {s.uid} | Branch: {s.branchId}</span>
+                          <span className="text-xs text-gray-500">Role: {s.role} | Branch: {s.branchId}</span>
                         </button>
                       ))}
                   </div>
@@ -455,12 +475,33 @@ export default function PayrollList() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Branch</label>
                   <input
                     type="text"
                     readOnly
                     className="w-full p-2 border border-gray-100 bg-gray-50 rounded-lg text-gray-500"
-                    value={employeeId}
+                    value={branchId}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">SSF No.</label>
+                  <input
+                    type="text"
+                    readOnly
+                    className="w-full p-2 border border-gray-100 bg-gray-50 rounded-lg text-gray-500"
+                    value={ssnNo}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ghana Card No.</label>
+                  <input
+                    type="text"
+                    readOnly
+                    className="w-full p-2 border border-gray-100 bg-gray-50 rounded-lg text-gray-500"
+                    value={ghanaCardNo}
                   />
                 </div>
               </div>
@@ -603,12 +644,33 @@ export default function PayrollList() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Branch</label>
                   <input
                     type="text"
                     readOnly
                     className="w-full p-2 border border-gray-100 bg-gray-50 rounded-lg text-gray-500"
-                    value={employeeId}
+                    value={selectedPayroll.branchId}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">SSF No.</label>
+                  <input
+                    type="text"
+                    readOnly
+                    className="w-full p-2 border border-gray-100 bg-gray-50 rounded-lg text-gray-500"
+                    value={ssnNo}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ghana Card No.</label>
+                  <input
+                    type="text"
+                    readOnly
+                    className="w-full p-2 border border-gray-100 bg-gray-50 rounded-lg text-gray-500"
+                    value={ghanaCardNo}
                   />
                 </div>
               </div>

@@ -25,6 +25,8 @@ export default function StaffDetails() {
   const [phone, setPhone] = useState('');
   const [basicSalary, setBasicSalary] = useState('');
   const [hireDate, setHireDate] = useState('');
+  const [ssnNo, setSsnNo] = useState('');
+  const [ghanaCardNo, setGhanaCardNo] = useState('');
 
   const canEdit = ['Admin', 'Director', 'Accountant'].includes(userProfile?.role || '');
   const canDelete = ['Admin', 'Director'].includes(userProfile?.role || '');
@@ -47,6 +49,8 @@ export default function StaffDetails() {
         setBranchId(data.branchId);
         setPhone(data.phone || '');
         setBasicSalary(data.basicSalary?.toString() || '0');
+        setSsnNo(data.ssnNo || '');
+        setGhanaCardNo(data.ghanaCardNo || '');
         setHireDate(data.hireDate ? format(new Date(data.hireDate), 'yyyy-MM-dd') : '');
       } else {
         alert('Staff member not found');
@@ -70,6 +74,8 @@ export default function StaffDetails() {
         branchId,
         phone,
         basicSalary: parseFloat(basicSalary) || 0,
+        ssnNo,
+        ghanaCardNo,
         hireDate: hireDate ? new Date(hireDate).toISOString() : null
       });
       setIsEditing(false);
@@ -195,6 +201,27 @@ export default function StaffDetails() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">SSF No.</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border border-gray-200 rounded-lg"
+                    value={ssnNo}
+                    onChange={e => setSsnNo(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ghana Card No.</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border border-gray-200 rounded-lg"
+                    value={ghanaCardNo}
+                    onChange={e => setGhanaCardNo(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
                   <select
                     className="w-full p-2 border border-gray-200 rounded-lg"
@@ -206,6 +233,8 @@ export default function StaffDetails() {
                     <option value="Accountant">Accountant</option>
                     <option value="Director">Director</option>
                     <option value="Admin">Admin</option>
+                    <option value="Marketer">Marketer</option>
+                    <option value="Driver">Driver</option>
                   </select>
                 </div>
                 <div>
@@ -304,6 +333,24 @@ export default function StaffDetails() {
                   <p className="text-lg font-medium text-gray-900">
                     {staff.hireDate ? format(new Date(staff.hireDate), 'MMM dd, yyyy') : 'N/A'}
                   </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="bg-gray-50 p-2 rounded-lg">
+                  <Shield className="text-gray-600" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">SSF No.</h3>
+                  <p className="text-lg font-medium text-gray-900">{staff.ssnNo || 'N/A'}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="bg-gray-50 p-2 rounded-lg">
+                  <Shield className="text-gray-600" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Ghana Card No.</h3>
+                  <p className="text-lg font-medium text-gray-900">{staff.ghanaCardNo || 'N/A'}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">

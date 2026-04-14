@@ -30,6 +30,8 @@ export default function StaffList() {
   const [phone, setPhone] = useState('');
   const [basicSalary, setBasicSalary] = useState('');
   const [hireDate, setHireDate] = useState('');
+  const [ssnNo, setSsnNo] = useState('');
+  const [ghanaCardNo, setGhanaCardNo] = useState('');
   // Note: Creating a user usually requires Firebase Auth create, which is separate from Firestore.
   // For this demo, we'll just add to Firestore 'users' collection, but in reality, an Admin SDK or Cloud Function is needed to create Auth users.
   // We'll simulate the Firestore part.
@@ -92,6 +94,8 @@ export default function StaffList() {
         branchId,
         phone,
         basicSalary: parseFloat(basicSalary) || 0,
+        ssnNo,
+        ghanaCardNo,
         hireDate: hireDate ? new Date(hireDate).toISOString() : null,
         createdAt: serverTimestamp(),
         hasUserAccount: false,
@@ -115,6 +119,8 @@ export default function StaffList() {
       setPhone('');
       setBasicSalary('');
       setHireDate('');
+      setSsnNo('');
+      setGhanaCardNo('');
       setRole('Cashier');
       fetchStaff();
       alert('Staff member added successfully (Note: Auth account not created in this demo)');
@@ -333,6 +339,29 @@ export default function StaffList() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">SSF No.</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border border-gray-200 rounded-lg"
+                    value={ssnNo}
+                    onChange={e => setSsnNo(e.target.value)}
+                    placeholder="Enter SSF No."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ghana Card No.</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border border-gray-200 rounded-lg"
+                    value={ghanaCardNo}
+                    onChange={e => setGhanaCardNo(e.target.value)}
+                    placeholder="Enter Ghana Card No."
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
                   <select
                     className="w-full p-2 border border-gray-200 rounded-lg"
@@ -344,6 +373,8 @@ export default function StaffList() {
                     <option value="Accountant">Accountant</option>
                     <option value="Director">Director</option>
                     <option value="Admin">Admin</option>
+                    <option value="Marketer">Marketer</option>
+                    <option value="Driver">Driver</option>
                   </select>
                 </div>
                 <div>

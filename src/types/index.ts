@@ -1,4 +1,4 @@
-export type Role = 'Cashier' | 'Manager' | 'Accountant' | 'Director' | 'Admin';
+export type Role = 'Cashier' | 'Manager' | 'Accountant' | 'Director' | 'Admin' | 'Marketer' | 'Driver';
 
 export type Branch = string;
 
@@ -20,6 +20,8 @@ export interface Staff {
   branchId: Branch;
   phone: string;
   basicSalary: number;
+  ssnNo?: string;
+  ghanaCardNo?: string;
   hireDate: any; // Firestore Timestamp or ISO string
   createdAt: any; // Firestore Timestamp
   hasUserAccount?: boolean;
@@ -159,6 +161,8 @@ export interface PayrollRecord {
   id: string;
   employeeId: string;
   employeeName: string;
+  ssnNo?: string;
+  ghanaCardNo?: string;
   month: string;
   basicSalary: number;
   ssnit: number;

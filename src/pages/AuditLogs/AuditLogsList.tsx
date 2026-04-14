@@ -192,6 +192,8 @@ export default function AuditLogsList() {
               <option value="Cashier">Cashier</option>
               <option value="Accountant">Accountant</option>
               <option value="Director">Director</option>
+              <option value="Marketer">Marketer</option>
+              <option value="Driver">Driver</option>
             </select>
           </div>
           {/* Add more filters as needed */}
