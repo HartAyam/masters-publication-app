@@ -4,14 +4,16 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, increment, serverTimestamp, addDoc, collection } from 'firebase/firestore';
 import { Modal } from '@/components/common/Modal';
 import { Product } from '@/types';
-import { ArrowLeft, Package, AlertTriangle, CheckCircle, Truck, X } from 'lucide-react';
+import { ArrowLeft, Package, AlertTriangle, CheckCircle, Truck, X, MapPin } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useBranches } from '@/hooks/useBranches';
 import { formatCurrency } from '@/lib/idUtils';
 
 export default function ProductDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { userProfile } = useAuth();
+  const { branches: dbBranches } = useBranches();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [showStockModal, setShowStockModal] = useState(false);
@@ -130,8 +132,9 @@ export default function ProductDetails() {
             <span className="px-2 py-1 bg-gray-100 rounded-md text-xs font-medium">
               {product.category}
             </span>
-            <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-medium">
-              {product.branchId} Branch
+            <span className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-medium">
+              <MapPin size={14} />
+              {dbBranches.find(b => b.id === product.branchId || b.name === product.branchId)?.name || product.branchId}
             </span>
           </div>
         </div>

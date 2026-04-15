@@ -127,7 +127,15 @@ export default function StaffDetails() {
               <h1 className="text-2xl font-bold text-gray-900">
                 {staff.displayName || 'Unnamed User'}
               </h1>
-              <p className="text-gray-500 text-sm">{staff.email}</p>
+              <div className="flex items-center gap-2 text-gray-500 text-sm">
+                <span>{staff.email}</span>
+                {staff.staffId && (
+                  <>
+                    <span>•</span>
+                    <span className="font-mono font-bold text-blue-600">{staff.staffId}</span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3">

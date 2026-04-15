@@ -56,3 +56,42 @@ export const generateUserId = async () => {
     return `USR${countStr}`;
   });
 };
+
+export const generateStaffId = async (branchName: string, role: string) => {
+  const roleMap: { [key: string]: string } = {
+    'Director': 'DC',
+    'Cashier': 'CS',
+    'Accountant': 'AC',
+    'Driver': 'DV',
+    'Marketer': 'MK',
+    'Manager': 'MG',
+    'Admin': 'AD'
+  };
+
+  const roleDesignation = roleMap[role] || 'XX';
+  
+  // Branch initials: "Atonsu - Gyinyasi" -> "AG"
+  // Split by non-alphanumeric characters, filter empty, take first letters
+  const branchInitials = branchName
+    .split(/[^a-zA-Z0-9]/)
+    .filter(word => word.length > 0)
+    .map(word => word[0].toUpperCase())
+    .join('');
+
+  const counterKey = `staff_${branchInitials}_${roleDesignation}`;
+  const counterRef = doc(db, 'counters', counterKey);
+
+  return await runTransaction(db, async (transaction) => {
+    const counterDoc = await transaction.get(counterRef);
+    let count = 1;
+
+    if (counterDoc.exists()) {
+      count = counterDoc.data().count + 1;
+    }
+
+    transaction.set(counterRef, { count, updatedAt: serverTimestamp() });
+
+    const countStr = count.toString().padStart(3, '0');
+    return `MP${branchInitials}${roleDesignation}${countStr}`;
+  });
+};

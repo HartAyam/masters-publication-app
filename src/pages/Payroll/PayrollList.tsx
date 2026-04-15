@@ -31,6 +31,7 @@ export default function PayrollList() {
   // Form State
   const [employeeName, setEmployeeName] = useState('');
   const [employeeId, setEmployeeId] = useState('');
+  const [staffId, setStaffId] = useState('');
   const [ssnNo, setSsnNo] = useState('');
   const [ghanaCardNo, setGhanaCardNo] = useState('');
   const [basicSalary, setBasicSalary] = useState('');
@@ -119,6 +120,7 @@ export default function PayrollList() {
       await addDoc(collection(db, 'payroll'), {
         employeeName,
         employeeId,
+        staffId,
         ssnNo,
         ghanaCardNo,
         month: selectedMonth,
@@ -148,6 +150,7 @@ export default function PayrollList() {
       setShowModal(false);
       setEmployeeName('');
       setEmployeeId('');
+      setStaffId('');
       setSsnNo('');
       setGhanaCardNo('');
       setBasicSalary('');
@@ -264,6 +267,7 @@ export default function PayrollList() {
     setSelectedPayroll(payroll);
     setEmployeeName(payroll.employeeName);
     setEmployeeId(payroll.employeeId);
+    setStaffId(payroll.staffId || '');
     setSsnNo(payroll.ssnNo || '');
     setGhanaCardNo(payroll.ghanaCardNo || '');
     setBasicSalary(payroll.basicSalary.toString());
@@ -438,7 +442,8 @@ export default function PayrollList() {
                     {staff
                       .filter(s => 
                         s.displayName?.toLowerCase().includes(staffSearchTerm.toLowerCase()) ||
-                        s.id?.toLowerCase().includes(staffSearchTerm.toLowerCase())
+                        s.id?.toLowerCase().includes(staffSearchTerm.toLowerCase()) ||
+                        s.staffId?.toLowerCase().includes(staffSearchTerm.toLowerCase())
                       )
                       .map(s => (
                         <button
@@ -448,6 +453,7 @@ export default function PayrollList() {
                           onClick={() => {
                             setEmployeeName(s.displayName || 'Unnamed');
                             setEmployeeId(s.id);
+                            setStaffId(s.staffId || '');
                             setSsnNo(s.ssnNo || '');
                             setGhanaCardNo(s.ghanaCardNo || '');
                             setBasicSalary(s.basicSalary?.toString() || '0');
@@ -456,7 +462,7 @@ export default function PayrollList() {
                             setShowStaffResults(false);
                           }}
                         >
-                          <span className="font-medium">{s.displayName}</span>
+                          <span className="font-medium">{s.displayName} {s.staffId && <span className="text-blue-600 ml-1">({s.staffId})</span>}</span>
                           <span className="text-xs text-gray-500">Role: {s.role} | Branch: {s.branchId}</span>
                         </button>
                       ))}

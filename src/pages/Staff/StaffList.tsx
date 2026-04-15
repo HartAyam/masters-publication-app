@@ -8,6 +8,7 @@ import { Plus, Search, User, X, Download, Printer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { logActivity } from '@/services/audit';
 import { exportToCSV, printDiv } from '@/lib/exportUtils';
+import { generateStaffId } from '@/lib/idUtils';
 import { format } from 'date-fns';
 import Pagination from '@/components/common/Pagination';
 
@@ -87,7 +88,11 @@ export default function StaffList() {
 
       // In a real app, you'd trigger a cloud function to create the Auth user.
       // Here we just add the document.
+      const branchName = dbBranches.find(b => b.id === branchId)?.name || branchId;
+      const staffId = await generateStaffId(branchName, role);
+
       await addDoc(collection(db, 'staff'), {
+        staffId,
         email,
         displayName,
         role,
@@ -232,11 +237,16 @@ export default function StaffList() {
                   className="hover:bg-gray-50 cursor-pointer"
                   onClick={() => navigate(`/staff/${user.id}`)}
                 >
-                  <td className="p-4 font-medium text-gray-900 flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
-                      {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
+                  <td className="p-4 font-medium text-gray-900">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+                        {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
+                      </div>
+                      <div className="flex flex-col">
+                        <span>{user.displayName || 'Unnamed User'}</span>
+                        {user.staffId && <span className="text-[10px] font-mono font-bold text-blue-600">{user.staffId}</span>}
+                      </div>
                     </div>
-                    {user.displayName || 'Unnamed User'}
                   </td>
                   <td className="p-4 text-gray-500">{user.email}</td>
                   <td className="p-4">

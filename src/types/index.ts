@@ -14,6 +14,7 @@ export interface UserProfile {
 
 export interface Staff {
   id: string;
+  staffId?: string;
   email: string;
   displayName: string;
   role: Role;
@@ -160,6 +161,7 @@ export interface ActivityLog {
 export interface PayrollRecord {
   id: string;
   employeeId: string;
+  staffId?: string;
   employeeName: string;
   ssnNo?: string;
   ghanaCardNo?: string;

@@ -4,7 +4,7 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { BranchModel } from '@/types';
 import { useAuth } from '@/context/AuthContext';
-import { ArrowLeft, MapPin, Phone, User, Save } from 'lucide-react';
+import { ArrowLeft, MapPin, Phone, User, Save, Banknote } from 'lucide-react';
 
 export default function BranchDetails() {
   const { id } = useParams();
@@ -38,16 +38,16 @@ export default function BranchDetails() {
       if (docSnap.exists()) {
         const data = { id: docSnap.id, ...docSnap.data() } as BranchModel;
         
-        // Fetch users to compute employee count and manager name
-        const usersQ = query(collection(db, 'users'));
-        const usersSnapshot = await getDocs(usersQ);
-        const usersData = usersSnapshot.docs.map(doc => doc.data());
+        // Fetch staff to compute employee count and manager name
+        const staffQ = query(collection(db, 'staff'));
+        const staffSnapshot = await getDocs(staffQ);
+        const staffData = staffSnapshot.docs.map(doc => doc.data());
         
-        const count = usersData.filter(user => user.branchId === data.id || user.branchId === data.name).length;
+        const count = staffData.filter(s => s.branchId === data.id || s.branchId === data.name).length;
         setEmployeeCount(count);
 
         if (!data.managerName && data.managerId) {
-          const manager = usersData.find(user => user.uid === data.managerId || user.id === data.managerId);
+          const manager = staffData.find(s => s.uid === data.managerId || s.id === data.managerId || s.staffId === data.managerId);
           if (manager) {
             data.managerName = manager.displayName || manager.name || manager.email;
           }
@@ -235,7 +235,7 @@ export default function BranchDetails() {
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="bg-green-50 p-2 rounded-lg">
-                    <Phone className="text-green-600" size={24} />
+                    <Banknote className="text-green-600" size={24} />
                   </div>
                   <div>
                     <h3 className="text-sm font-medium text-gray-500">MoMo Number</h3>

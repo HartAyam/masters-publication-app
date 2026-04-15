@@ -5,9 +5,9 @@ import { collection, addDoc, serverTimestamp, setDoc, doc, getDocs, updateDoc, d
 import { createUserWithEmailAndPassword, sendPasswordResetEmail, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { ROLES, isGlobalUser } from '@/lib/utils';
 import { useBranches } from '@/hooks/useBranches';
-import { generateUserId } from '@/lib/idUtils';
-import { Edit2, Trash2, X, Save, RefreshCw, AlertTriangle, Database, Key } from 'lucide-react';
-import { UserProfile } from '@/types';
+import { generateUserId, generateStaffId } from '@/lib/idUtils';
+import { Edit2, Trash2, X, Save, RefreshCw, AlertTriangle, Database, Key, Users } from 'lucide-react';
+import { UserProfile, Staff } from '@/types';
 import { Modal, ConfirmModal } from '@/components/common/Modal';
 
 export default function Admin() {
@@ -295,6 +295,45 @@ export default function Admin() {
     }
   };
 
+  const handleRegenerateStaffIds = async () => {
+    if (!window.confirm('This will regenerate all Staff IDs based on the new algorithm. Continue?')) return;
+    setLoading(true);
+    try {
+      // 1. Fetch all staff
+      const staffSnap = await getDocs(collection(db, 'staff'));
+      const allStaff = staffSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff));
+      
+      // 2. Fetch all branches for name lookup
+      const branchSnap = await getDocs(collection(db, 'branches'));
+      const branches = branchSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      
+      // 3. Clear existing staff counters to start from 001
+      const counterSnap = await getDocs(collection(db, 'counters'));
+      const staffCounters = counterSnap.docs.filter(doc => doc.id.startsWith('staff_'));
+      const batch = writeBatch(db);
+      staffCounters.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+
+      // 4. Regenerate IDs one by one
+      for (const staffMember of allStaff) {
+        const branch = branches.find(b => b.id === staffMember.branchId || b.name === staffMember.branchId);
+        const branchName = branch?.name || staffMember.branchId;
+        const newStaffId = await generateStaffId(branchName, staffMember.role);
+        
+        await updateDoc(doc(db, 'staff', staffMember.id), {
+          staffId: newStaffId
+        });
+      }
+      
+      setFeedback({ type: 'success', message: 'Staff IDs regenerated successfully!' });
+    } catch (error: any) {
+      console.error("Error regenerating staff IDs:", error);
+      setFeedback({ type: 'error', message: `Failed to regenerate staff IDs: ${error.message}` });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
@@ -413,13 +452,21 @@ export default function Admin() {
                 <span className="text-sm text-gray-600">Database Status</span>
                 <span className="font-bold text-green-600">Connected</span>
               </div>
-              <div className="pt-4">
+              <div className="pt-4 space-y-2">
                 <button
                   onClick={() => setShowPurgeModal(true)}
                   className="w-full py-2 bg-red-50 text-red-600 border border-red-100 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2 font-medium"
                 >
                   <AlertTriangle size={18} />
                   Purge Database
+                </button>
+                <button
+                  onClick={handleRegenerateStaffIds}
+                  disabled={loading}
+                  className="w-full py-2 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center gap-2 font-medium disabled:opacity-50"
+                >
+                  <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                  Regenerate Staff IDs
                 </button>
               </div>
             </div>

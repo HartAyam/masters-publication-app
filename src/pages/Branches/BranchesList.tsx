@@ -3,7 +3,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, getDocs, addDoc, serverTimestamp, deleteDoc, doc, where } from 'firebase/firestore';
 import { BranchModel } from '@/types';
 import { useAuth } from '@/context/AuthContext';
-import { Plus, Search, MapPin, Phone, User, X } from 'lucide-react';
+import { Plus, Search, MapPin, Phone, User, X, Banknote } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { logActivity } from '@/services/audit';
 import Pagination from '@/components/common/Pagination';
@@ -38,17 +38,17 @@ export default function BranchesList() {
       const snapshot = await getDocs(q);
       let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BranchModel));
       
-      // Fetch users to compute employee count
-      const usersQ = query(collection(db, 'users'));
-      const usersSnapshot = await getDocs(usersQ);
-      const usersData = usersSnapshot.docs.map(doc => doc.data());
+      // Fetch staff to compute employee count
+      const staffQ = query(collection(db, 'staff'));
+      const staffSnapshot = await getDocs(staffQ);
+      const staffData = staffSnapshot.docs.map(doc => doc.data());
 
       // Compute employee count and manager name per branch
       data = data.map(branch => {
-        const employeeCount = usersData.filter(user => user.branchId === branch.id || user.branchId === branch.name).length;
+        const employeeCount = staffData.filter(s => s.branchId === branch.id || s.branchId === branch.name).length;
         let managerName = branch.managerName;
         if (!managerName && branch.managerId) {
-          const manager = usersData.find(user => user.uid === branch.managerId || user.id === branch.managerId);
+          const manager = staffData.find(s => s.uid === branch.managerId || s.id === branch.managerId || s.staffId === branch.managerId);
           if (manager) {
             managerName = manager.displayName || manager.name || manager.email;
           }
@@ -214,7 +214,7 @@ export default function BranchesList() {
               </div>
               {branch.momoNumber && (
                 <div className="flex items-center gap-2">
-                  <Phone size={16} className="text-gray-400" />
+                  <Banknote size={16} className="text-gray-400" />
                   <span className="font-medium">MoMo:</span> {branch.momoNumber}
                 </div>
               )}
