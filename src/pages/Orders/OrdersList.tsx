@@ -139,7 +139,7 @@ export default function OrdersList() {
           <h1 className="text-2xl font-bold text-gray-900">Orders & Invoices</h1>
           <p className="text-gray-500">Manage and view all transactions</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button 
             onClick={handleExport}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
@@ -156,7 +156,7 @@ export default function OrdersList() {
           </button>
           <button 
             onClick={() => navigate('/pos')}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            className="w-full md:w-auto flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Plus size={20} />
             <span>New Order</span>

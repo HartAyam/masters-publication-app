@@ -154,7 +154,7 @@ export default function StaffList() {
         Name: s.displayName || s.email,
         Email: s.email,
         Role: s.role,
-        Branch: s.branchId,
+        Branch: dbBranches.find(b => b.id === s.branchId || b.name === s.branchId)?.name || s.branchId,
         Phone: s.phone || 'N/A',
       };
       if (userProfile?.role !== 'Cashier') {
@@ -172,7 +172,7 @@ export default function StaffList() {
           <h1 className="text-2xl font-bold text-gray-900">Staff Management</h1>
           <p className="text-gray-500">Manage employees and their roles</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button 
             onClick={handleExport}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
@@ -190,7 +190,7 @@ export default function StaffList() {
           {canEdit && (
             <button 
               onClick={() => setShowModal(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-sm transition-colors"
+              className="w-full md:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 shadow-sm transition-colors"
             >
               <Plus size={20} />
               Add New Staff
@@ -215,8 +215,9 @@ export default function StaffList() {
 
       {/* List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden" id="staff-table">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 border-b border-gray-100">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm min-w-[600px]">
+            <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
               <th className="p-4 font-medium text-gray-600">Name</th>
               <th className="p-4 font-medium text-gray-600">Email</th>
@@ -269,6 +270,7 @@ export default function StaffList() {
           </tbody>
         </table>
       </div>
+    </div>
 
       {totalPages > 1 && (
         <div className="mt-6 flex justify-center">

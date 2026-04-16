@@ -74,9 +74,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     if (auth) {
+      localStorage.removeItem('lastActivity');
       await firebaseSignOut(auth);
     }
   };
+
+  // Session Management: Auto-logout after 10 minutes of inactivity
+  useEffect(() => {
+    if (!user) return;
+
+    const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
+
+    const updateActivity = () => {
+      localStorage.setItem('lastActivity', Date.now().toString());
+    };
+
+    const checkInactivity = () => {
+      const lastActivity = parseInt(localStorage.getItem('lastActivity') || '0');
+      if (lastActivity && Date.now() - lastActivity > INACTIVITY_LIMIT) {
+        // Clear activity and logout
+        localStorage.removeItem('lastActivity');
+        // Set a flag for the login page to show the expired message
+        localStorage.setItem('sessionExpired', 'true');
+        logout();
+      }
+    };
+
+    // Initialize activity on login
+    if (!localStorage.getItem('lastActivity')) {
+      updateActivity();
+    }
+
+    // Listen for user interactions
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach(event => window.addEventListener(event, updateActivity));
+
+    // Check inactivity every 10 seconds
+    const interval = setInterval(checkInactivity, 10000);
+
+    return () => {
+      events.forEach(event => window.removeEventListener(event, updateActivity));
+      clearInterval(interval);
+    };
+  }, [user]);
 
   return (
     <AuthContext.Provider value={{ user, userProfile, loading, logout, isConfigured: isFirebaseConfigured, error }}>

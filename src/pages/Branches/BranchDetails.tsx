@@ -110,9 +110,14 @@ export default function BranchDetails() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {isEditing ? 'Edit Branch' : branch.name}
-          </h1>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {isEditing ? 'Edit Branch' : branch.name}
+            </h1>
+            {!isEditing && branch.branchId && (
+              <span className="text-xs font-mono font-bold text-blue-600">{branch.branchId}</span>
+            )}
+          </div>
           {canEdit && !isEditing && (
             <button
               onClick={() => setIsEditing(true)}

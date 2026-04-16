@@ -5,7 +5,7 @@ import { collection, addDoc, serverTimestamp, setDoc, doc, getDocs, updateDoc, d
 import { createUserWithEmailAndPassword, sendPasswordResetEmail, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { ROLES, isGlobalUser } from '@/lib/utils';
 import { useBranches } from '@/hooks/useBranches';
-import { generateUserId, generateStaffId } from '@/lib/idUtils';
+import { generateUserId, generateStaffId, generateBranchId } from '@/lib/idUtils';
 import { Edit2, Trash2, X, Save, RefreshCw, AlertTriangle, Database, Key, Users } from 'lucide-react';
 import { UserProfile, Staff } from '@/types';
 import { Modal, ConfirmModal } from '@/components/common/Modal';
@@ -334,6 +334,38 @@ export default function Admin() {
     }
   };
 
+  const handleRegenerateBranchIds = async () => {
+    if (!window.confirm('Are you sure you want to regenerate all Branch IDs? This will overwrite existing IDs.')) return;
+    
+    setLoading(true);
+    try {
+      // 1. Fetch all branches
+      const branchSnap = await getDocs(collection(db, 'branches'));
+      const allBranches = branchSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      
+      // 2. Clear existing branches counter
+      const batch = writeBatch(db);
+      batch.delete(doc(db, 'counters', 'branches_global'));
+      await batch.commit();
+
+      // 3. Regenerate IDs one by one
+      for (const branch of allBranches) {
+        const newBranchId = await generateBranchId();
+        
+        await updateDoc(doc(db, 'branches', branch.id), {
+          branchId: newBranchId
+        });
+      }
+      
+      setFeedback({ type: 'success', message: 'Branch IDs regenerated successfully!' });
+    } catch (error: any) {
+      console.error("Error regenerating branch IDs:", error);
+      setFeedback({ type: 'error', message: `Failed to regenerate branch IDs: ${error.message}` });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
@@ -467,6 +499,14 @@ export default function Admin() {
                 >
                   <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                   Regenerate Staff IDs
+                </button>
+                <button
+                  onClick={handleRegenerateBranchIds}
+                  disabled={loading}
+                  className="w-full py-2 bg-purple-50 text-purple-600 border border-purple-100 rounded-lg hover:bg-purple-100 transition-colors flex items-center justify-center gap-2 font-medium disabled:opacity-50"
+                >
+                  <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                  Regenerate Branch IDs
                 </button>
               </div>
             </div>

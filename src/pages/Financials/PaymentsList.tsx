@@ -197,7 +197,7 @@ export default function PaymentsList() {
           <h1 className="text-2xl font-bold text-gray-900">Customer Payments</h1>
           <p className="text-gray-500 text-sm">Track and manage payments from credit customers</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button 
             onClick={handleExport}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
@@ -214,7 +214,7 @@ export default function PaymentsList() {
           </button>
           <button 
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+            className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
           >
             <Plus size={18} />
             Record Payment

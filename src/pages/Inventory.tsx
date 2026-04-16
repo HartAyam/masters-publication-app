@@ -202,7 +202,7 @@ export default function Inventory() {
           <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
           <p className="text-gray-500 text-sm">Track and manage stock levels across all branches</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button 
             onClick={() => navigate('/reports/inventory')}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
@@ -226,7 +226,7 @@ export default function Inventory() {
           </button>
           <button 
             onClick={() => setShowAddForm(!showAddForm)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-sm transition-colors"
+            className="w-full md:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 shadow-sm transition-colors"
           >
             <Plus size={20} />
             Add New

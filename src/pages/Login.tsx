@@ -1,17 +1,26 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { useNavigate, Link } from 'react-router-dom';
-import { Lock, Mail, AlertCircle, CheckCircle } from 'lucide-react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { Lock, Mail, AlertCircle, CheckCircle, Clock, Eye, EyeOff } from 'lucide-react';
 import { Modal } from '@/components/common/Modal';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Check for session expired flag
+  const [sessionExpired, setSessionExpired] = useState(() => {
+    const expired = localStorage.getItem('sessionExpired') === 'true';
+    if (expired) localStorage.removeItem('sessionExpired');
+    return expired;
+  });
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,6 +81,13 @@ export default function Login() {
           </div>
         )}
 
+        {sessionExpired && !error && (
+          <div className="bg-amber-50 text-amber-700 p-3 rounded-lg mb-6 text-sm flex items-center gap-2 border border-amber-100">
+            <Clock size={16} />
+            Your session has expired due to inactivity. Please sign in again.
+          </div>
+        )}
+
         {success && (
           <div className="bg-green-50 text-green-600 p-3 rounded-lg mb-6 text-sm flex items-center gap-2">
             <CheckCircle size={16} />
@@ -108,19 +124,26 @@ export default function Login() {
                 Forgot password?
               </button>
             </div>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-gray-400" />
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
               </div>
-              <input
-                type="password"
-                required
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
           </div>
 
           <button

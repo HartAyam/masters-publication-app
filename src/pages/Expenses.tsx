@@ -159,7 +159,7 @@ export default function Expenses() {
           <h1 className="text-2xl font-bold text-gray-900">Expense Ledger</h1>
           <p className="text-gray-500">Track and manage business expenses</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button 
             onClick={handleExport}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
@@ -176,7 +176,7 @@ export default function Expenses() {
           </button>
           <button 
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+            className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
           >
             <Plus size={18} />
             New Voucher

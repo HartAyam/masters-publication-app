@@ -95,3 +95,21 @@ export const generateStaffId = async (branchName: string, role: string) => {
     return `MP${branchInitials}${roleDesignation}${countStr}`;
   });
 };
+
+export const generateBranchId = async () => {
+  const counterRef = doc(db, 'counters', 'branches_global');
+
+  return await runTransaction(db, async (transaction) => {
+    const counterDoc = await transaction.get(counterRef);
+    let count = 1;
+
+    if (counterDoc.exists()) {
+      count = counterDoc.data().count + 1;
+    }
+
+    transaction.set(counterRef, { count, updatedAt: serverTimestamp() });
+
+    const countStr = count.toString().padStart(3, '0');
+    return `MPBR${countStr}`;
+  });
+};

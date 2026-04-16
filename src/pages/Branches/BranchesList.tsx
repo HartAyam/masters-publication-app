@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Plus, Search, MapPin, Phone, User, X, Banknote } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { logActivity } from '@/services/audit';
+import { generateBranchId } from '@/lib/idUtils';
 import Pagination from '@/components/common/Pagination';
 
 export default function BranchesList() {
@@ -106,7 +107,10 @@ export default function BranchesList() {
         return;
       }
 
+      const branchId = await generateBranchId();
+
       await addDoc(collection(db, 'branches'), {
+        branchId,
         name,
         location,
         managerId,
@@ -193,7 +197,10 @@ export default function BranchesList() {
             onClick={() => navigate(`/branches/${branch.id}`)}
           >
             <div className="flex justify-between items-start mb-4">
-              <h3 className="text-lg font-bold text-gray-900">{branch.name}</h3>
+              <div className="flex flex-col">
+                <h3 className="text-lg font-bold text-gray-900">{branch.name}</h3>
+                {branch.branchId && <span className="text-[10px] font-mono font-bold text-blue-600">{branch.branchId}</span>}
+              </div>
               <span className={`px-2 py-1 rounded-full text-xs font-medium ${branch.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                 {branch.isActive ? 'Active' : 'Inactive'}
               </span>

@@ -252,7 +252,7 @@ export default function StaffDetails() {
                     value={branchId}
                     onChange={e => setBranchId(e.target.value)}
                   >
-                    {dbBranches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                    {dbBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
                 </div>
               </div>
@@ -309,7 +309,9 @@ export default function StaffDetails() {
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-gray-500">Branch</h3>
-                  <p className="text-lg font-medium text-gray-900">{staff.branchId}</p>
+                  <p className="text-lg font-medium text-gray-900">
+                    {dbBranches.find(b => b.id === staff.branchId || b.name === staff.branchId)?.name || staff.branchId}
+                  </p>
                 </div>
               </div>
               <div className="flex items-start gap-3">

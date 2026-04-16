@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, serverTimestamp, addDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, serverTimestamp, addDoc, collection, deleteDoc } from 'firebase/firestore';
 import { Modal } from '@/components/common/Modal';
 import { Product } from '@/types';
-import { ArrowLeft, Package, AlertTriangle, CheckCircle, Truck, X, MapPin } from 'lucide-react';
+import { ArrowLeft, Package, AlertTriangle, CheckCircle, Truck, X, MapPin, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useBranches } from '@/hooks/useBranches';
 import { formatCurrency } from '@/lib/idUtils';
+import { logActivity } from '@/services/audit';
 
 export default function ProductDetails() {
   const { id } = useParams();
@@ -21,6 +22,7 @@ export default function ProductDetails() {
   const [quantity, setQuantity] = useState('');
   const [notes, setNotes] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     fetchProduct();
@@ -104,6 +106,34 @@ export default function ProductDetails() {
     }
   };
 
+  const handleDeleteProduct = async () => {
+    if (!id || !product) return;
+    setActionLoading(true);
+    try {
+      await deleteDoc(doc(db, 'products', id));
+      
+      if (userProfile) {
+        await logActivity(
+          'Delete Product',
+          `Deleted product: ${product.name} (SKU: ${product.sku})`,
+          userProfile.uid,
+          userProfile.role,
+          userProfile.branchId,
+          userProfile.displayName,
+          userProfile.email
+        );
+      }
+      
+      alert('Product deleted successfully');
+      navigate('/inventory');
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      alert('Failed to delete product');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading) {
     return <div className="p-8 text-center">Loading product details...</div>;
   }
@@ -138,11 +168,18 @@ export default function ProductDetails() {
             </span>
           </div>
         </div>
-        <div className="text-right">
+        <div className="text-right flex flex-col items-end gap-2">
           <div className="text-3xl font-bold text-gray-900">
             {product.stockLevel}
           </div>
           <div className="text-sm text-gray-500">Current Stock</div>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="mt-2 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium"
+            title="Delete Product"
+          >
+            <Trash2 size={14} /> Delete Record
+          </button>
         </div>
       </div>
 
@@ -284,6 +321,41 @@ export default function ProductDetails() {
               className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
             >
               {actionLoading ? 'Updating...' : 'Confirm Damage'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Delete Product Record"
+      >
+        <div className="space-y-4">
+          <div className="bg-red-50 p-4 rounded-lg flex items-start gap-3">
+            <AlertTriangle className="text-red-600 shrink-0" size={24} />
+            <div>
+              <p className="text-sm font-bold text-red-800">Warning: Irreversible Action</p>
+              <p className="text-xs text-red-700 mt-1">
+                This will permanently delete <strong>{product.name}</strong> from the inventory. 
+                This action cannot be undone.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setShowDeleteModal(false)}
+              className="flex-1 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteProduct}
+              disabled={actionLoading}
+              className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+            >
+              {actionLoading ? 'Deleting...' : 'Delete Permanently'}
             </button>
           </div>
         </div>
