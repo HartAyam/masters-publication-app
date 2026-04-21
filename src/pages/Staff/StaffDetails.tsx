@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { UserProfile, Role, Branch, BranchModel, Staff } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useBranches } from '@/hooks/useBranches';
@@ -20,6 +20,7 @@ export default function StaffDetails() {
 
   // Form State
   const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
   const [role, setRole] = useState<Role>('Cashier');
   const [branchId, setBranchId] = useState<string>('');
   const [phone, setPhone] = useState('');
@@ -29,7 +30,7 @@ export default function StaffDetails() {
   const [ghanaCardNo, setGhanaCardNo] = useState('');
 
   const canEdit = ['Admin', 'Director', 'Accountant'].includes(userProfile?.role || '');
-  const canDelete = ['Admin', 'Director'].includes(userProfile?.role || '');
+  const canDelete = true; // Granted access to all roles for the delete functionality
 
   useEffect(() => {
     fetchStaff();
@@ -45,6 +46,7 @@ export default function StaffDetails() {
         const data = { id: docSnap.id, ...docSnap.data() } as Staff;
         setStaff(data);
         setDisplayName(data.displayName || '');
+        setEmail(data.email || '');
         setRole(data.role);
         setBranchId(data.branchId);
         setPhone(data.phone || '');
@@ -70,6 +72,7 @@ export default function StaffDetails() {
     try {
       await updateDoc(doc(db, 'staff', id), {
         displayName,
+        email,
         role,
         branchId,
         phone,
@@ -92,6 +95,33 @@ export default function StaffDetails() {
   const handleDelete = async () => {
     if (!id || !canDelete) return;
     setLoading(true);
+
+    try {
+      // Check for approved payrolls
+      const q = query(
+        collection(db, 'payroll'),
+        where('employeeId', '==', id),
+        where('status', 'in', ['Approved', 'Paid'])
+      );
+      const payrollSnap = await getDocs(q);
+      
+      if (!payrollSnap.empty) {
+        alert("Cannot delete staff member because they have approved or paid payroll records.");
+        setLoading(false);
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking payrolls:", error);
+      alert("Error verifying staff payrolls before deletion.");
+      setLoading(false);
+      return;
+    }
+
+    if (!window.confirm('Are you sure you want to delete this staff member?')) {
+      setLoading(false);
+      return;
+    }
+
     try {
       await deleteDoc(doc(db, 'staff', id));
       alert('Staff member deleted successfully');
@@ -118,9 +148,9 @@ export default function StaffDetails() {
       </button>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+        <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-50 gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xl">
+            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xl flex-shrink-0">
               {staff.displayName ? staff.displayName.charAt(0).toUpperCase() : 'U'}
             </div>
             <div>
@@ -128,7 +158,7 @@ export default function StaffDetails() {
                 {staff.displayName || 'Unnamed User'}
               </h1>
               <div className="flex items-center gap-2 text-gray-500 text-sm">
-                <span>{staff.email}</span>
+                <span className="truncate max-w-[150px] sm:max-w-xs">{staff.email}</span>
                 {staff.staffId && (
                   <>
                     <span>•</span>
@@ -138,7 +168,7 @@ export default function StaffDetails() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-start sm:justify-end">
             {canEdit && !isEditing && (
               <button
                 onClick={() => setIsEditing(true)}
@@ -161,15 +191,27 @@ export default function StaffDetails() {
         <div className="p-6">
           {isEditing ? (
             <form onSubmit={handleUpdate} className="space-y-4 max-w-lg">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
-                <input
-                  type="text"
-                  required
-                  className="w-full p-2 border border-gray-200 rounded-lg"
-                  value={displayName}
-                  onChange={e => setDisplayName(e.target.value)}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full p-2 border border-gray-200 rounded-lg"
+                    value={displayName}
+                    onChange={e => setDisplayName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    required
+                    className="w-full p-2 border border-gray-200 rounded-lg"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                  />
+                </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">

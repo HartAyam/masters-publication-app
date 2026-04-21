@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, orderBy, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, addDoc, updateDoc, doc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { PayrollRecord, Branch, BranchModel } from '@/types';
 import { isGlobalUser } from '@/lib/utils';
 import { useBranches } from '@/hooks/useBranches';
 import { useAuth } from '@/context/AuthContext';
-import { Plus, DollarSign, FileText, X, Search, CheckCircle, Printer, Download } from 'lucide-react';
+import { Plus, DollarSign, FileText, X, Search, CheckCircle, Printer, Download, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { logActivity } from '@/services/audit';
 import { formatCurrency } from '@/lib/idUtils';
@@ -261,6 +261,32 @@ export default function PayrollList() {
       { 'Description': 'Net Salary', 'Amount': selectedPayroll.netSalary }
     ];
     exportToCSV(data, `Payslip_${selectedPayroll.employeeName}_${selectedPayroll.month}`);
+  };
+
+  const handleDeletePayroll = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this payroll record?')) return;
+    setLoading(true);
+    try {
+      await deleteDoc(doc(db, 'payroll', id));
+      if (userProfile) {
+        await logActivity(
+          'Delete Payroll',
+          `Deleted payroll record ${id}`,
+          userProfile.uid,
+          userProfile.role,
+          userProfile.branchId,
+          userProfile.displayName,
+          userProfile.email
+        );
+      }
+      setSelectedPayroll(null);
+      setIsEditing(false);
+      fetchPayrolls();
+    } catch (error) {
+      console.error("Error deleting payroll:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openDetails = (payroll: PayrollRecord) => {
@@ -834,6 +860,15 @@ export default function PayrollList() {
                       >
                         Okay
                       </button>
+                      {(selectedPayroll.status === 'Pending Approval' || selectedPayroll.status === 'Draft') && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePayroll(selectedPayroll.id)}
+                          className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center justify-center gap-2"
+                        >
+                          <Trash2 size={18} /> Delete
+                        </button>
+                      )}
                     </div>
                   </>
                 )}

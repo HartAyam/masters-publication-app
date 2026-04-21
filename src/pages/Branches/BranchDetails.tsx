@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { BranchModel } from '@/types';
 import { useAuth } from '@/context/AuthContext';
-import { ArrowLeft, MapPin, Phone, User, Save, Banknote } from 'lucide-react';
+import { ArrowLeft, MapPin, Phone, User, Save, Banknote, Trash2 } from 'lucide-react';
 
 export default function BranchDetails() {
   const { id } = useParams();
@@ -95,6 +95,18 @@ export default function BranchDetails() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete this branch?')) return;
+    try {
+      await deleteDoc(doc(db, 'branches', id!));
+      alert('Branch deleted successfully');
+      navigate('/branches');
+    } catch (error) {
+      console.error("Error deleting branch:", error);
+      alert('Failed to delete branch');
+    }
+  };
+
   if (loading) return <div className="p-8 text-center">Loading branch details...</div>;
   if (!branch) return null;
 
@@ -118,14 +130,24 @@ export default function BranchDetails() {
               <span className="text-xs font-mono font-bold text-blue-600">{branch.branchId}</span>
             )}
           </div>
-          {canEdit && !isEditing && (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Edit Branch
-            </button>
-          )}
+          <div className="flex gap-2">
+            {canEdit && !isEditing && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Edit Branch
+              </button>
+            )}
+            {!isEditing && (
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+              >
+                <Trash2 size={18} /> Delete
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="p-6">

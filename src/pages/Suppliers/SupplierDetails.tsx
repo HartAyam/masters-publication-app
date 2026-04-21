@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, orderBy, getDocs, deleteDoc } from 'firebase/firestore';
 import { Supplier, Expense } from '@/types';
-import { ArrowLeft, User, Building, Phone, Mail, MapPin } from 'lucide-react';
+import { ArrowLeft, User, Building, Phone, Mail, MapPin, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/idUtils';
 
 export default function SupplierDetails() {
@@ -60,6 +60,18 @@ export default function SupplierDetails() {
     fetchSupplierData();
   }, [id, userProfile]);
 
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete this supplier?')) return;
+    try {
+      await deleteDoc(doc(db, 'suppliers', id!));
+      alert('Supplier deleted successfully');
+      navigate('/suppliers');
+    } catch (error) {
+      console.error("Error deleting supplier:", error);
+      alert('Failed to delete supplier');
+    }
+  };
+
   if (loading) return <div className="p-8 text-center">Loading...</div>;
   if (error) return <div className="p-8 text-center text-red-600">{error}</div>;
   if (!supplier) return <div className="p-8 text-center">Supplier not found</div>;
@@ -86,6 +98,15 @@ export default function SupplierDetails() {
                 <span>{supplier.primaryBranch} Branch</span>
               </div>
             </div>
+          </div>
+          <div className="text-right space-y-3">
+            <button
+               onClick={handleDelete}
+               className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm ml-auto"
+            >
+              <Trash2 size={18} />
+              Delete Supplier
+            </button>
           </div>
         </div>
 

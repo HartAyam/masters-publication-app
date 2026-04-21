@@ -857,7 +857,7 @@ export default function Dashboard() {
                       <td className="p-4 text-gray-500">{expense.description}</td>
                       <td className="p-4 font-bold text-rose-600">{formatCurrency(expense.amount)}</td>
                       <td className="p-4 text-gray-500">{expense.recipient}</td>
-                      {isPrivileged && <td className="p-4 text-gray-500">{expense.branchId}</td>}
+                      {isPrivileged && <td className="p-4 text-gray-500">{dbBranches.find(b => b.id === expense.branchId || b.name === expense.branchId)?.name || expense.branchId}</td>}
                     </tr>
                   ))
                 )}

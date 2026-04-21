@@ -28,10 +28,6 @@ export default function Admin() {
   const [editRole, setEditRole] = useState('');
   const [editBranch, setEditBranch] = useState('');
 
-  const [showPurgeModal, setShowPurgeModal] = useState(false);
-  const [purgePassword, setPurgePassword] = useState('');
-  const [purgeLoading, setPurgeLoading] = useState(false);
-
   // Password Reset & Change States
   const [resetTarget, setResetTarget] = useState<string | null>(null);
   const [changePasswordTarget, setChangePasswordTarget] = useState<UserProfile | null>(null);
@@ -253,119 +249,6 @@ export default function Admin() {
     }
   };
 
-  const handlePurgeDatabase = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!auth.currentUser?.email) return;
-
-    setPurgeLoading(true);
-    try {
-      // Re-authenticate user
-      const credential = EmailAuthProvider.credential(auth.currentUser.email, purgePassword);
-      await reauthenticateWithCredential(auth.currentUser, credential);
-    } catch (error: any) {
-      console.error("Re-authentication failed:", error);
-      if (error.code === 'auth/invalid-credential') {
-        setFeedback({ type: 'error', message: 'Invalid password. Re-authentication failed.' });
-      } else {
-        setFeedback({ type: 'error', message: `Authentication failed: ${error.message}` });
-      }
-      setPurgeLoading(false);
-      return;
-    }
-
-    try {
-      const collections = ['transactions', 'products', 'expenses', 'payments', 'activity_logs', 'payroll', 'customers', 'suppliers', 'branches'];
-      
-      for (const collName of collections) {
-        const snap = await getDocs(collection(db, collName));
-        const batch = writeBatch(db);
-        snap.docs.forEach(doc => batch.delete(doc.ref));
-        await batch.commit();
-      }
-
-      setFeedback({ type: 'success', message: 'Database purged successfully. All collections have been cleared.' });
-      setShowPurgeModal(false);
-      setPurgePassword('');
-      fetchUsers();
-    } catch (error: any) {
-      console.error("Purge error:", error);
-      setFeedback({ type: 'error', message: `Purge failed: ${error.message}` });
-    } finally {
-      setPurgeLoading(false);
-    }
-  };
-
-  const handleRegenerateStaffIds = async () => {
-    if (!window.confirm('This will regenerate all Staff IDs based on the new algorithm. Continue?')) return;
-    setLoading(true);
-    try {
-      // 1. Fetch all staff
-      const staffSnap = await getDocs(collection(db, 'staff'));
-      const allStaff = staffSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff));
-      
-      // 2. Fetch all branches for name lookup
-      const branchSnap = await getDocs(collection(db, 'branches'));
-      const branches = branchSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      
-      // 3. Clear existing staff counters to start from 001
-      const counterSnap = await getDocs(collection(db, 'counters'));
-      const staffCounters = counterSnap.docs.filter(doc => doc.id.startsWith('staff_'));
-      const batch = writeBatch(db);
-      staffCounters.forEach(doc => batch.delete(doc.ref));
-      await batch.commit();
-
-      // 4. Regenerate IDs one by one
-      for (const staffMember of allStaff) {
-        const branch = branches.find(b => b.id === staffMember.branchId || b.name === staffMember.branchId);
-        const branchName = branch?.name || staffMember.branchId;
-        const newStaffId = await generateStaffId(branchName, staffMember.role);
-        
-        await updateDoc(doc(db, 'staff', staffMember.id), {
-          staffId: newStaffId
-        });
-      }
-      
-      setFeedback({ type: 'success', message: 'Staff IDs regenerated successfully!' });
-    } catch (error: any) {
-      console.error("Error regenerating staff IDs:", error);
-      setFeedback({ type: 'error', message: `Failed to regenerate staff IDs: ${error.message}` });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegenerateBranchIds = async () => {
-    if (!window.confirm('Are you sure you want to regenerate all Branch IDs? This will overwrite existing IDs.')) return;
-    
-    setLoading(true);
-    try {
-      // 1. Fetch all branches
-      const branchSnap = await getDocs(collection(db, 'branches'));
-      const allBranches = branchSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      
-      // 2. Clear existing branches counter
-      const batch = writeBatch(db);
-      batch.delete(doc(db, 'counters', 'branches_global'));
-      await batch.commit();
-
-      // 3. Regenerate IDs one by one
-      for (const branch of allBranches) {
-        const newBranchId = await generateBranchId();
-        
-        await updateDoc(doc(db, 'branches', branch.id), {
-          branchId: newBranchId
-        });
-      }
-      
-      setFeedback({ type: 'success', message: 'Branch IDs regenerated successfully!' });
-    } catch (error: any) {
-      console.error("Error regenerating branch IDs:", error);
-      setFeedback({ type: 'error', message: `Failed to regenerate branch IDs: ${error.message}` });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
@@ -392,12 +275,6 @@ export default function Admin() {
             </div>
           )}
         </div>
-        <button
-          onClick={() => setShowPurgeModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-        >
-          <Database size={18} /> Purge Database
-        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -483,31 +360,6 @@ export default function Admin() {
               <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                 <span className="text-sm text-gray-600">Database Status</span>
                 <span className="font-bold text-green-600">Connected</span>
-              </div>
-              <div className="pt-4 space-y-2">
-                <button
-                  onClick={() => setShowPurgeModal(true)}
-                  className="w-full py-2 bg-red-50 text-red-600 border border-red-100 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2 font-medium"
-                >
-                  <AlertTriangle size={18} />
-                  Purge Database
-                </button>
-                <button
-                  onClick={handleRegenerateStaffIds}
-                  disabled={loading}
-                  className="w-full py-2 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center gap-2 font-medium disabled:opacity-50"
-                >
-                  <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                  Regenerate Staff IDs
-                </button>
-                <button
-                  onClick={handleRegenerateBranchIds}
-                  disabled={loading}
-                  className="w-full py-2 bg-purple-50 text-purple-600 border border-purple-100 rounded-lg hover:bg-purple-100 transition-colors flex items-center justify-center gap-2 font-medium disabled:opacity-50"
-                >
-                  <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                  Regenerate Branch IDs
-                </button>
               </div>
             </div>
           </div>
@@ -755,54 +607,6 @@ export default function Admin() {
             </div>
           </form>
         </Modal>
-      )}
-
-      {/* Purge Database Modal */}
-      {showPurgeModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto custom-scrollbar">
-            <div className="flex items-center gap-3 text-red-600 mb-4">
-              <AlertTriangle size={32} />
-              <h2 className="text-xl font-bold">Purge Database</h2>
-            </div>
-            <p className="text-gray-600 mb-6">
-              This action will permanently delete all transactions, products, expenses, payments, and other records. 
-              Users will remain. This cannot be undone.
-            </p>
-            <form onSubmit={handlePurgeDatabase} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Enter your password to confirm"
-                  className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
-                  value={purgePassword}
-                  onChange={e => setPurgePassword(e.target.value)}
-                />
-              </div>
-              <div className="pt-4 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowPurgeModal(false);
-                    setPurgePassword('');
-                  }}
-                  className="flex-1 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={purgeLoading}
-                  className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {purgeLoading ? 'Purging...' : 'Confirm Purge'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
     </div>
   );
