@@ -82,9 +82,12 @@ export default function PayrollList() {
       }
       
       if (!isGlobalUser(userProfile.role)) {
-        data = data.filter(p => p.branchId === userProfile.branchId);
+        data = data.filter(p => 
+          p.branchId === userProfile.branchId || 
+          dbBranches.find(b => b.name === p.branchId)?.id === userProfile.branchId
+        );
       } else if (selectedBranch !== 'ALL') {
-        data = data.filter(p => p.branchId === selectedBranch);
+        data = data.filter(p => !p.branchId || p.branchId === selectedBranch || dbBranches.find(b => b.id === p.branchId || b.branchId === p.branchId)?.name === selectedBranch);
       }
 
       if (selectedStatus !== 'ALL') {
@@ -395,7 +398,9 @@ export default function PayrollList() {
                         {!payroll.ssnNo && !payroll.ghanaCardNo && payroll.employeeId}
                       </div>
                     </td>
-                    <td className="p-4 text-gray-500">{payroll.branchId}</td>
+                    <td className="p-4 text-gray-500">
+                      {dbBranches.find(b => b.id === payroll.branchId || b.branchId === payroll.branchId || b.name === payroll.branchId)?.name || payroll.branchId}
+                    </td>
                     <td className="p-4">{formatCurrency(payroll.basicSalary)}</td>
                     <td className="p-4 text-green-600">+ {formatCurrency(payroll.bonuses)}</td>
                     <td className="p-4 text-red-600">
@@ -489,7 +494,9 @@ export default function PayrollList() {
                           }}
                         >
                           <span className="font-medium">{s.displayName} {s.staffId && <span className="text-blue-600 ml-1">({s.staffId})</span>}</span>
-                          <span className="text-xs text-gray-500">Role: {s.role} | Branch: {s.branchId}</span>
+                          <span className="text-xs text-gray-500">
+                            Role: {s.role} | Branch: {dbBranches.find(b => b.id === s.branchId || b.branchId === s.branchId || b.name === s.branchId)?.name || s.branchId}
+                          </span>
                         </button>
                       ))}
                   </div>
@@ -512,7 +519,7 @@ export default function PayrollList() {
                     type="text"
                     readOnly
                     className="w-full p-2 border border-gray-100 bg-gray-50 rounded-lg text-gray-500"
-                    value={branchId}
+                    value={dbBranches.find(b => b.id === branchId || b.branchId === branchId || b.name === branchId)?.name || branchId}
                   />
                 </div>
               </div>
@@ -681,7 +688,7 @@ export default function PayrollList() {
                     type="text"
                     readOnly
                     className="w-full p-2 border border-gray-100 bg-gray-50 rounded-lg text-gray-500"
-                    value={selectedPayroll.branchId}
+                    value={dbBranches.find(b => b.id === selectedPayroll.branchId || b.branchId === selectedPayroll.branchId || b.name === selectedPayroll.branchId)?.name || selectedPayroll.branchId}
                   />
                 </div>
               </div>

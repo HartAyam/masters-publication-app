@@ -294,7 +294,7 @@ export default function StaffDetails() {
                     value={branchId}
                     onChange={e => setBranchId(e.target.value)}
                   >
-                    {dbBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    {dbBranches.map(b => <option key={b.id} value={b.branchId || b.id}>{b.name}</option>)}
                   </select>
                 </div>
               </div>

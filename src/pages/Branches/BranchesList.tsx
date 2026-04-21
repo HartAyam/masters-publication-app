@@ -46,7 +46,11 @@ export default function BranchesList() {
 
       // Compute employee count and manager name per branch
       data = data.map(branch => {
-        const employeeCount = staffData.filter(s => s.branchId === branch.id || s.branchId === branch.name).length;
+        const employeeCount = staffData.filter(s => 
+          s.branchId === branch.id || 
+          s.branchId === branch.branchId || 
+          s.branchId === branch.name
+        ).length;
         let managerName = branch.managerName;
         if (!managerName && branch.managerId) {
           const manager = staffData.find(s => s.uid === branch.managerId || s.id === branch.managerId || s.staffId === branch.managerId);

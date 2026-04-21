@@ -45,7 +45,8 @@ export default function StaffList() {
 
   useEffect(() => {
     if (dbBranches.length > 0 && !branchId) {
-      setBranchId(dbBranches[0].id);
+      const defaultBranch = dbBranches[0];
+      setBranchId(defaultBranch.branchId || defaultBranch.id);
     }
   }, [dbBranches, branchId]);
 
@@ -396,7 +397,7 @@ export default function StaffList() {
                     value={branchId}
                     onChange={e => setBranchId(e.target.value)}
                   >
-                    {dbBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    {dbBranches.map(b => <option key={b.id} value={b.branchId || b.id}>{b.name}</option>)}
                   </select>
                 </div>
               </div>

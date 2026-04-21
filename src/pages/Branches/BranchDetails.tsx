@@ -43,7 +43,11 @@ export default function BranchDetails() {
         const staffSnapshot = await getDocs(staffQ);
         const staffData = staffSnapshot.docs.map(doc => doc.data());
         
-        const count = staffData.filter(s => s.branchId === data.id || s.branchId === data.name).length;
+        const count = staffData.filter(s => 
+          s.branchId === data.id || 
+          s.branchId === data.branchId || 
+          s.branchId === data.name
+        ).length;
         setEmployeeCount(count);
 
         if (!data.managerName && data.managerId) {
