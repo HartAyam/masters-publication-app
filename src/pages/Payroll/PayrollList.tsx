@@ -8,9 +8,11 @@ import { useAuth } from '@/context/AuthContext';
 import { Plus, DollarSign, FileText, X, Search, CheckCircle, Printer, Download, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { logActivity } from '@/services/audit';
-import { formatCurrency } from '@/lib/idUtils';
+import { formatCurrency, generatePayslipId, formatCurrencyNoUnit } from '@/lib/idUtils';
 import Pagination from '@/components/common/Pagination';
 import { printDiv, exportToCSV } from '@/lib/exportUtils';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function PayrollList() {
   const { userProfile } = useAuth();
@@ -119,6 +121,7 @@ export default function PayrollList() {
       const bonusVal = parseFloat(bonuses) || 0;
       
       const net = basic + bonusVal - ssnitVal - payeVal - otherDeduct;
+      const payslipId = await generatePayslipId(selectedMonth);
 
       await addDoc(collection(db, 'payroll'), {
         employeeName,
@@ -135,6 +138,7 @@ export default function PayrollList() {
         netSalary: net,
         status: 'Pending Approval',
         branchId: isGlobalUser(userProfile?.role || '') ? branchId : userProfile?.branchId,
+        payslipId,
         createdAt: serverTimestamp(),
       });
 
@@ -307,17 +311,139 @@ export default function PayrollList() {
     setIsEditing(false);
   };
 
+  const handleDownloadTable = () => {
+    const dataToExport = payrolls.map(p => ({
+      'Month': p.month,
+      'Employee Name': p.employeeName,
+      'Branch': dbBranches.find(b => b.id === p.branchId || b.branchId === p.branchId || b.name === p.branchId)?.name || p.branchId,
+      'Basic': p.basicSalary,
+      'Bonuses': p.bonuses,
+      'SSNIT': p.ssnit,
+      'PAYE': p.paye,
+      'Others': p.otherDeductions,
+      'Net Salary': p.netSalary,
+      'Status': p.status
+    }));
+    exportToCSV(dataToExport, `Payroll_Summary_${selectedMonth}`);
+  };
+
+  const handleDownloadPayslipPDF = () => {
+    if (!selectedPayroll) return;
+    
+    const doc = new jsPDF();
+    const branchName = dbBranches.find(b => b.id === selectedPayroll.branchId || b.branchId === selectedPayroll.branchId || b.name === selectedPayroll.branchId)?.name || selectedPayroll.branchId;
+    
+    // Logo at top
+    doc.addImage('/logo.png', 'PNG', 95, 10, 20, 20);
+
+    // Watermark
+    doc.saveGraphicsState();
+    doc.setGState(new (doc as any).GState({ opacity: 0.1 }));
+    doc.addImage('/logo.png', 'PNG', 55, 100, 100, 100);
+    doc.restoreGraphicsState();
+
+    // Header
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('MASTERS PUBLICATION', 105, 38, { align: 'center' });
+    
+    doc.setFontSize(14);
+    doc.text(`${branchName} Branch`, 105, 48, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Ghana', 105, 54, { align: 'center' });
+    
+    // Payslip Title
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PAYSLIP', 105, 68, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`ID: #${selectedPayroll.payslipId || selectedPayroll.id}`, 105, 74, { align: 'center' });
+    doc.text(`Month: ${selectedPayroll.month}`, 105, 80, { align: 'center' });
+    
+    // Details
+    doc.setDrawColor(200);
+    doc.line(20, 88, 190, 88);
+    
+    doc.setFontSize(10);
+    doc.text('Employee Details:', 20, 98);
+    doc.setFontSize(12);
+    doc.text(selectedPayroll.employeeName, 20, 106);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Staff No.: ${selectedPayroll.staffId || selectedPayroll.employeeId}`, 20, 112);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('Status:', 150, 98);
+    doc.setTextColor(34, 197, 94); // Green
+    doc.text(selectedPayroll.status.toUpperCase(), 190, 98, { align: 'right' });
+    doc.setTextColor(100);
+    doc.setFont('helvetica', 'normal');
+    if (selectedPayroll.ghanaCardNo) {
+      doc.text(`ID No.: ${selectedPayroll.ghanaCardNo}`, 190, 106, { align: 'right' });
+    }
+    doc.setTextColor(0);
+    
+    // Table
+    autoTable(doc, {
+      startY: 120,
+      head: [['Description', { content: 'Amount', styles: { halign: 'right' } }]],
+      body: [
+        ['Basic Salary', formatCurrencyNoUnit(selectedPayroll.basicSalary)],
+        ['Bonuses', `+ ${formatCurrencyNoUnit(selectedPayroll.bonuses)}`],
+        ['SSNIT Deduction', `- ${formatCurrencyNoUnit(selectedPayroll.ssnit)}`],
+        ['PAYE Deduction', `- ${formatCurrencyNoUnit(selectedPayroll.paye)}`],
+        ['Other Deductions', `- ${formatCurrencyNoUnit(selectedPayroll.otherDeductions)}`],
+      ],
+      foot: [['Net Salary', formatCurrency(selectedPayroll.netSalary)]],
+      theme: 'striped',
+      headStyles: { fillColor: [17, 24, 39], halign: 'left' },
+      footStyles: { fillColor: [17, 24, 39], halign: 'right' },
+      columnStyles: {
+        1: { halign: 'right' }
+      },
+      didParseCell: function (data) {
+        if (data.section === 'foot' && data.column.index === 0) {
+          data.cell.styles.halign = 'left';
+        }
+      }
+    });
+    
+    const finalY = (doc as any).lastAutoTable.finalY + 30;
+    
+    // Signatures
+    doc.line(20, finalY, 80, finalY);
+    doc.text('Employee Signature', 50, finalY + 5, { align: 'center' });
+    
+    doc.line(130, finalY, 190, finalY);
+    doc.text('Manager Signature', 160, finalY + 5, { align: 'center' });
+    
+    doc.save(`Payslip_${selectedPayroll.employeeName}_${selectedPayroll.month}.pdf`);
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Payroll Management</h1>
-        <button 
-          onClick={() => setShowModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          <Plus size={20} />
-          New Payroll Entry
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={handleDownloadTable}
+            className="bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+          >
+            <Download size={20} />
+            Download Table
+          </button>
+          <button 
+            onClick={() => setShowModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+          >
+            <Plus size={20} />
+            New Payroll Entry
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -835,7 +961,7 @@ export default function PayrollList() {
                           </button>
                           <button 
                             type="button"
-                            onClick={handleDownloadPayslip}
+                            onClick={handleDownloadPayslipPDF}
                             className="flex-1 py-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-2"
                           >
                             <Download size={18} /> Download
@@ -889,7 +1015,9 @@ export default function PayrollList() {
                       <img src="/logo.png" alt="Logo" className="h-12 w-12 object-contain" onError={(e) => (e.currentTarget.style.display = 'none')} />
                       <h1 className="text-3xl font-black text-gray-900 tracking-tighter">MASTERS PUBLICATION</h1>
                     </div>
-                    <p className="text-lg font-bold text-gray-700">{selectedPayroll.branchId} Branch</p>
+                    <p className="text-lg font-bold text-gray-700">
+                      {dbBranches.find(b => b.id === selectedPayroll.branchId || b.branchId === selectedPayroll.branchId || b.name === selectedPayroll.branchId)?.name || selectedPayroll.branchId} Branch
+                    </p>
                     <p className="text-sm text-gray-500">Ghana</p>
                   </div>
 
@@ -897,7 +1025,7 @@ export default function PayrollList() {
                     <h2 className="text-xl font-black uppercase tracking-[0.2em] text-gray-900 border-b-2 border-gray-900 px-8 pb-1 mb-2">
                       Payslip
                     </h2>
-                    <p className="text-sm font-mono text-gray-500">#{selectedPayroll.id}</p>
+                    <p className="text-sm font-mono text-gray-500">#{selectedPayroll.payslipId || selectedPayroll.id}</p>
                     <p className="text-sm text-gray-900 mt-1 uppercase tracking-widest font-bold">
                       Month: {selectedPayroll.month}
                     </p>
@@ -908,12 +1036,15 @@ export default function PayrollList() {
                       <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Employee Details:</h3>
                       <div className="space-y-1">
                         <p className="text-lg font-bold text-gray-900">{selectedPayroll.employeeName}</p>
-                        <p className="text-sm text-gray-600">ID: {selectedPayroll.employeeId}</p>
+                        <p className="text-sm text-gray-600">Staff No.: <span className="font-mono font-bold text-blue-600 ml-1">{selectedPayroll.staffId || selectedPayroll.employeeId}</span></p>
                       </div>
                     </div>
                     <div className="text-right">
                       <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Status:</h3>
                       <p className="text-sm font-bold text-green-600 uppercase">{selectedPayroll.status}</p>
+                      {selectedPayroll.ghanaCardNo && (
+                        <p className="text-sm text-gray-600 mt-1">ID No.: <span className="font-mono font-bold text-blue-600 ml-1">{selectedPayroll.ghanaCardNo}</span></p>
+                      )}
                     </div>
                   </div>
 
@@ -927,28 +1058,28 @@ export default function PayrollList() {
                     <tbody className="divide-y divide-gray-100">
                       <tr className="text-sm">
                         <td className="py-4 font-medium text-gray-900">Basic Salary</td>
-                        <td className="py-4 text-right text-gray-900">{formatCurrency(selectedPayroll.basicSalary)}</td>
+                        <td className="py-4 text-right text-gray-900">{formatCurrencyNoUnit(selectedPayroll.basicSalary)}</td>
                       </tr>
                       <tr className="text-sm">
                         <td className="py-4 font-medium text-gray-900">Bonuses</td>
-                        <td className="py-4 text-right text-green-600">+ {formatCurrency(selectedPayroll.bonuses)}</td>
+                        <td className="py-4 text-right text-green-600">+ {formatCurrencyNoUnit(selectedPayroll.bonuses)}</td>
                       </tr>
                       <tr className="text-sm">
                         <td className="py-4 font-medium text-gray-900">SSNIT Deduction</td>
-                        <td className="py-4 text-right text-red-600">- {formatCurrency(selectedPayroll.ssnit)}</td>
+                        <td className="py-4 text-right text-red-600">- {formatCurrencyNoUnit(selectedPayroll.ssnit)}</td>
                       </tr>
                       <tr className="text-sm">
                         <td className="py-4 font-medium text-gray-900">PAYE Deduction</td>
-                        <td className="py-4 text-right text-red-600">- {formatCurrency(selectedPayroll.paye)}</td>
+                        <td className="py-4 text-right text-red-600">- {formatCurrencyNoUnit(selectedPayroll.paye)}</td>
                       </tr>
                       <tr className="text-sm">
                         <td className="py-4 font-medium text-gray-900">Other Deductions</td>
-                        <td className="py-4 text-right text-red-600">- {formatCurrency(selectedPayroll.otherDeductions)}</td>
+                        <td className="py-4 text-right text-red-600">- {formatCurrencyNoUnit(selectedPayroll.otherDeductions)}</td>
                       </tr>
                     </tbody>
                     <tfoot className="border-t-2 border-gray-900">
                       <tr className="bg-gray-900 text-white">
-                        <td className="py-4 text-right text-sm font-black uppercase tracking-widest px-4">Net Salary</td>
+                        <td className="py-4 text-left text-sm font-black uppercase tracking-widest px-4">Net Salary</td>
                         <td className="py-4 text-right text-lg font-black px-4">{formatCurrency(selectedPayroll.netSalary)}</td>
                       </tr>
                     </tfoot>

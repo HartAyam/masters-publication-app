@@ -10,6 +10,14 @@ export const formatCurrency = (amount: number) => {
   return `GHS ${formattedNumber}`;
 };
 
+export const formatCurrencyNoUnit = (amount: number) => {
+  return new Intl.NumberFormat('en-GH', {
+    style: 'decimal',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+};
+
 export const generateInvoiceId = async (type: string, branchId: string) => {
   const prefixMap: { [key: string]: string } = {
     'Cash Sale': 'CS',
@@ -111,5 +119,32 @@ export const generateBranchId = async () => {
 
     const countStr = count.toString().padStart(3, '0');
     return `MPBR${countStr}`;
+  });
+};
+
+export const generatePayslipId = async (monthStr: string) => {
+  // format: MPPS###MMYYYY
+  // hashes (#) represent 3 digits starting from 001
+  // MM and YY stand for the month (numerical) and year (last two digits)
+  
+  const [year, month] = monthStr.split('-');
+  const mm = month.padStart(2, '0');
+  const yy = year.substring(2);
+  
+  const counterRef = doc(db, 'counters', `payslips_${year}_${month}`);
+  
+  return await runTransaction(db, async (transaction) => {
+    const counterDoc = await transaction.get(counterRef);
+    let count = 1;
+    
+    if (counterDoc.exists()) {
+      count = counterDoc.data().count + 1;
+    }
+    
+    transaction.set(counterRef, { count, updatedAt: serverTimestamp() });
+    
+    const countStr = count.toString().padStart(3, '0');
+    // Using explicit MM and YY as requested
+    return `MPPS${countStr}${mm}${yy}`;
   });
 };

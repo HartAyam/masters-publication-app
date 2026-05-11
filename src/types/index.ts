@@ -175,6 +175,7 @@ export interface PayrollRecord {
   status: 'Pending Approval' | 'Approved' | 'Paid' | 'Draft';
   paymentDate?: any;
   branchId: string;
+  payslipId?: string;
 }
 
 export interface FinancialReport {
