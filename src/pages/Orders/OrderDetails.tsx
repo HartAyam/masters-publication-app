@@ -82,10 +82,12 @@ export default function OrderDetails() {
         }
 
         // Fetch Branch
-        const branchQ = query(collection(db, 'branches'), where('name', '==', orderData.branchId));
+        const branchQ = query(collection(db, 'branches'));
         const branchSnapshot = await getDocs(branchQ);
-        if (!branchSnapshot.empty) {
-          setBranch({ id: branchSnapshot.docs[0].id, ...branchSnapshot.docs[0].data() as any } as BranchModel);
+        const branches = branchSnapshot.docs.map(d => ({ id: d.id, ...d.data() as any } as BranchModel));
+        const matchedBranch = branches.find(b => b.id === orderData.branchId || b.branchId === orderData.branchId || b.name === orderData.branchId);
+        if (matchedBranch) {
+          setBranch(matchedBranch);
         }
       } else {
         console.log("No such document!");
@@ -444,7 +446,7 @@ export default function OrderDetails() {
           <div className="flex flex-col items-center text-center mb-4">
             <img src="/logo.png" alt="Logo" className="h-20 w-20 object-contain mb-2" onError={(e) => (e.currentTarget.style.display = 'none')} />
             <h1 className="text-2xl font-black text-gray-900 tracking-tighter">MASTERS PUBLICATION</h1>
-            <p className="text-base font-bold text-gray-700">{order.branchId} Branch</p>
+            <p className="text-base font-bold text-gray-700">{branch?.name || order.branchId} Branch</p>
             <p className="text-xs text-gray-500">{branch?.location || 'Ghana'}</p>
             <div className="flex items-center gap-4 text-xs text-gray-500">
               {branch?.contactPhone && <span><span className="font-bold">Tel:</span> {branch.contactPhone}</span>}
