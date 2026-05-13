@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, orderBy, limit, onSnapshot, QuerySnapshot, DocumentData } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, orderBy, limit, onSnapshot, QuerySnapshot, DocumentData, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { Expense } from '@/types';
 import { logActivity } from '@/services/audit';
-import { Download, Printer, Search, Plus, Filter, Calendar, CreditCard, User, ArrowRight, X } from 'lucide-react';
+import { Download, Printer, Search, Plus, Filter, Calendar, CreditCard, User, ArrowRight, X, Trash2, Edit, Save, AlertTriangle } from 'lucide-react';
 import { exportToCSV, printDiv } from '@/lib/exportUtils';
 import { format, startOfWeek, startOfMonth, startOfQuarter, startOfYear, isAfter } from 'date-fns';
 import { formatCurrency } from '@/lib/idUtils';
@@ -26,6 +26,17 @@ export default function Expenses() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [isEditingExpense, setIsEditingExpense] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  
+  // Edit Form State
+  const [editAmount, setEditAmount] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editRecipient, setEditRecipient] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editApproverName, setEditApproverName] = useState('');
+  
+  const canEdit = ['Admin', 'Director', 'Accountant', 'Manager'].includes(userProfile?.role || '');
   
   useEffect(() => {
     if (dbBranches.length > 0 && !branchId) {
@@ -150,6 +161,66 @@ export default function Expenses() {
       Branch: e.branchId
     }));
     exportToCSV(dataToExport, `Expenses_${format(new Date(), 'yyyy-MM-dd')}`);
+  };
+
+  const handleEditInit = () => {
+    if (!selectedExpense) return;
+    setEditAmount(selectedExpense.amount.toString());
+    setEditCategory(selectedExpense.category);
+    setEditRecipient(selectedExpense.recipient);
+    setEditDescription(selectedExpense.description || '');
+    setEditApproverName(selectedExpense.approverName);
+    setIsEditingExpense(true);
+  };
+
+  const handleUpdateExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedExpense) return;
+    setLoading(true);
+
+    try {
+      await updateDoc(doc(db, 'expenses', selectedExpense.id!), {
+        amount: parseFloat(editAmount),
+        category: editCategory,
+        recipient: editRecipient,
+        description: editDescription,
+        approverName: editApproverName,
+      });
+
+      setSelectedExpense((prev) => prev ? {
+        ...prev,
+        amount: parseFloat(editAmount),
+        category: editCategory,
+        recipient: editRecipient,
+        description: editDescription,
+        approverName: editApproverName,
+      } : null);
+
+      setIsEditingExpense(false);
+      alert('Voucher Updated Successfully');
+    } catch (error) {
+      console.error("Error updating voucher:", error);
+      alert('Failed to update voucher');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteExpense = async () => {
+    if (!selectedExpense?.id) return;
+    setLoading(true);
+    try {
+      await deleteDoc(doc(db, 'expenses', selectedExpense.id));
+      setShowDeleteConfirm(false);
+      setShowDetailsModal(false);
+      setSelectedExpense(null);
+      alert('Voucher Deleted Successfully');
+    } catch (error) {
+      console.error("Error deleting voucher:", error);
+      alert('Failed to delete voucher');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -360,6 +431,8 @@ export default function Expenses() {
                     onClick={() => {
                       setSelectedExpense(expense);
                       setShowDetailsModal(true);
+                      setIsEditingExpense(false);
+                      setShowDeleteConfirm(false);
                     }}
                   >
                     <td className="p-4 text-gray-500">
@@ -400,12 +473,121 @@ export default function Expenses() {
             <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-blue-50">
               <h2 className="font-bold text-blue-900 flex items-center gap-2">
                 <CreditCard size={20} />
-                Expense Voucher Details
+                {isEditingExpense ? 'Edit Expense Voucher' : 'Expense Voucher Details'}
               </h2>
               <button onClick={() => setShowDetailsModal(false)} className="text-gray-400 hover:text-gray-600">
                 <X size={24} />
               </button>
             </div>
+
+            {isEditingExpense ? (
+              <form onSubmit={handleUpdateExpense} className="p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Amount (GHS)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      className="w-full p-2 border border-gray-200 rounded-lg"
+                      value={editAmount}
+                      onChange={(e) => setEditAmount(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select
+                      className="w-full p-2 border border-gray-200 rounded-lg"
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value)}
+                    >
+                      <option>Operations</option>
+                      <option>Utilities</option>
+                      <option>Salary</option>
+                      <option>Maintenance</option>
+                      <option>Restock</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Recipient / Payee</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full p-2 border border-gray-200 rounded-lg"
+                    value={editRecipient}
+                    onChange={(e) => setEditRecipient(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    className="w-full p-2 border border-gray-200 rounded-lg"
+                    rows={2}
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Approver Name</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full p-2 border border-gray-200 rounded-lg"
+                    value={editApproverName}
+                    onChange={(e) => setEditApproverName(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingExpense(false)}
+                    className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 flex items-center justify-center gap-2"
+                  >
+                    <Save size={18} />
+                    {loading ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            ) : showDeleteConfirm ? (
+              <div className="p-6 text-center space-y-4">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto text-red-600 mb-4">
+                  <AlertTriangle size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">Delete Expense Voucher?</h3>
+                <p className="text-gray-500">
+                  Are you sure you want to delete this expense voucher for <strong>{selectedExpense.recipient}</strong>? This action cannot be undone.
+                </p>
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeleteExpense}
+                    disabled={loading}
+                    className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 flex items-center justify-center gap-2"
+                  >
+                    <Trash2 size={18} />
+                    {loading ? 'Deleting...' : 'Yes, Delete'}
+                  </button>
+                </div>
+              </div>
+            ) : (
             <div className="p-6 space-y-6">
               <div className="flex justify-between items-start">
                 <div>
@@ -456,15 +638,32 @@ export default function Expenses() {
                 </div>
               </div>
 
-              <div className="pt-4">
+              <div className="flex gap-3 pt-4">
+                {canEdit && (
+                  <>
+                    <button
+                      onClick={handleEditInit}
+                      className="flex-1 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <Edit size={18} /> Edit
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="flex-1 py-3 bg-white border border-gray-200 text-red-600 rounded-xl font-bold hover:bg-red-50 flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <Trash2 size={18} /> Delete
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={() => setShowDetailsModal(false)}
-                  className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+                  className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors"
                 >
                   Close
                 </button>
               </div>
             </div>
+            )}
           </div>
         </div>
       )}

@@ -198,6 +198,7 @@ export default function Dashboard() {
         let depositSales = 0;
 
         transactions.forEach(t => {
+          if (t.status === 'Adjusted' || t.isBackup) return;
           const amount = t.totalAmount || 0;
           if (t.type === 'Cash Sale') {
             cashSales += amount;
@@ -220,6 +221,7 @@ export default function Dashboard() {
         // Top Customers
         const customerMap = new Map<string, { id?: string; name: string; total: number; count: number }>();
         transactions.forEach(t => {
+          if (t.status === 'Adjusted' || t.isBackup) return;
           if (t.customerName) {
             const key = t.customerId || t.customerName;
             const existing = customerMap.get(key) || { id: t.customerId, name: t.customerName, total: 0, count: 0 };
@@ -235,6 +237,7 @@ export default function Dashboard() {
         // Sales Over Time
         const salesByDateMap = new Map<string, { date: string; amount: number; timestamp: number }>();
         transactions.forEach(t => {
+          if (t.status === 'Adjusted' || t.isBackup) return;
           if (!t.date || !t.date.toDate) return;
           const dateObj = t.date.toDate();
           const dateKey = format(dateObj, 'yyyy-MM-dd');
@@ -249,6 +252,7 @@ export default function Dashboard() {
         // Sales By Branch
         const salesByBranchMap = new Map<string, number>();
         transactions.forEach(t => {
+          if (t.status === 'Adjusted' || t.isBackup) return;
           salesByBranchMap.set(t.branchId, (salesByBranchMap.get(t.branchId) || 0) + t.totalAmount);
         });
         const salesByBranch = Array.from(salesByBranchMap.entries())

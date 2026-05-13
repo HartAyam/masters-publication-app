@@ -30,6 +30,7 @@ export default function OrderDetails() {
   
   // Adjust state
   const [adjustedItems, setAdjustedItems] = useState<SaleItem[]>([]);
+  const [adjustDiscount, setAdjustDiscount] = useState<number>(0);
   
   // Return state
   const [returnType, setReturnType] = useState<'Full' | 'Partial'>('Full');
@@ -45,6 +46,7 @@ export default function OrderDetails() {
   useEffect(() => {
     if (order) {
       setAdjustedItems([...order.items]);
+      setAdjustDiscount(order.discount || 0);
       setReturnItems(order.items.map(item => ({ ...item, quantity: 0, total: 0 })));
       setSupplyItems(order.items.map(item => ({ 
         ...item, 
@@ -122,7 +124,9 @@ export default function OrderDetails() {
       await addDoc(collection(db, 'transactions'), backupData);
 
       // 2. Calculate new totals
-      const newTotalAmount = adjustedItems.reduce((sum, item) => sum + item.total, 0);
+      const newSubtotal = adjustedItems.reduce((sum, item) => sum + item.total, 0);
+      const newDiscountAmount = (adjustDiscount / 100) * newSubtotal;
+      const newTotalAmount = newSubtotal - newDiscountAmount;
       const amountDiff = order.totalAmount - newTotalAmount;
 
       // 3. Update stock
@@ -151,7 +155,8 @@ export default function OrderDetails() {
       await updateDoc(transactionRef, {
         items: adjustedItems,
         totalAmount: newTotalAmount,
-        balanceDue: order.type === 'Credit Sale' ? newTotalAmount - order.amountPaid : order.balanceDue,
+        discount: adjustDiscount,
+        balanceDue: order.type === 'Credit Sale' ? newTotalAmount - order.amountPaid : Math.max(0, newTotalAmount - order.amountPaid),
         isAdjusted: true,
         adjustmentDate: serverTimestamp()
       });
@@ -669,12 +674,28 @@ export default function OrderDetails() {
               </table>
             </div>
             
-            <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-between items-center">
-              <div>
-                <p className="text-xs text-gray-500 uppercase font-semibold">New Total</p>
-                <p className="text-xl font-bold text-gray-900">
-                  {formatCurrency(adjustedItems.reduce((sum, i) => sum + i.total, 0))}
-                </p>
+            <div className="p-6 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+              <div className="flex gap-6 items-center">
+                <div>
+                  <label className="block text-xs text-gray-500 uppercase font-semibold mb-1">Discount (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    className="w-24 p-2 border border-gray-200 rounded-lg text-sm"
+                    value={adjustDiscount === 0 ? '' : adjustDiscount}
+                    onChange={(e) => setAdjustDiscount(Number(e.target.value))}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold mb-1">New Total</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {formatCurrency(
+                      adjustedItems.reduce((sum, i) => sum + i.total, 0) * (1 - adjustDiscount / 100)
+                    )}
+                  </p>
+                </div>
               </div>
               <div className="flex gap-3">
                 <button 
