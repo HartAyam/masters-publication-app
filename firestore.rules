@@ -119,9 +119,7 @@ service cloud.firestore {
 
     // Expenses collection
     match /expenses/{expenseId} {
-      allow read: if isAccountant();
-      allow create: if isManager();
-      allow update: if isAccountant();
+      allow read, write: if isStaff();
     }
 
     // Activity Logs collection

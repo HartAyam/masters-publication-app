@@ -36,7 +36,7 @@ export default function Expenses() {
   const [editDescription, setEditDescription] = useState('');
   const [editApproverName, setEditApproverName] = useState('');
   
-  const canEdit = ['Admin', 'Director', 'Accountant', 'Manager'].includes(userProfile?.role || '');
+  const canEdit = ['Admin', 'Director', 'Accountant', 'Manager', 'Cashier'].includes(userProfile?.role || '');
   
   useEffect(() => {
     if (dbBranches.length > 0 && !branchId) {
