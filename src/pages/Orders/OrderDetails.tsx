@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '../../lib/firebase';
 import { doc, getDoc, updateDoc, addDoc, setDoc, collection, serverTimestamp, increment, query, where, getDocs, Timestamp } from 'firebase/firestore';
-import { Transaction, SaleItem, Customer, BranchModel, UserProfile } from '../../types';
+import { Transaction, SaleItem, Customer, BranchModel, UserProfile, Staff } from '../../types';
 import { ArrowLeft, Printer, Download, Calendar, User, CreditCard, MapPin, X, Trash2, AlertCircle, CheckCircle2, ShoppingCart, Mail, Phone, Building } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { logActivity } from '@/services/audit';
@@ -25,7 +25,7 @@ export default function OrderDetails() {
   const [supplyType, setSupplyType] = useState<'Full' | 'Partial'>('Full');
   const [supplyItems, setSupplyItems] = useState<SaleItem[]>([]);
   const [suppliedByStaff, setSuppliedByStaff] = useState('');
-  const [staffList, setStaffList] = useState<UserProfile[]>([]);
+  const [staffList, setStaffList] = useState<Staff[]>([]);
   const [processing, setProcessing] = useState(false);
   
   // Adjust state
@@ -58,9 +58,14 @@ export default function OrderDetails() {
 
   const fetchStaff = async () => {
     try {
-      const q = query(collection(db, 'users'));
+      let q;
+      if (userProfile?.branchId) {
+        q = query(collection(db, 'staff'), where('branchId', '==', userProfile.branchId));
+      } else {
+        q = query(collection(db, 'staff'));
+      }
       const snapshot = await getDocs(q);
-      setStaffList(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
+      setStaffList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as Staff)));
     } catch (error) {
       console.error("Error fetching staff:", error);
     }
@@ -846,7 +851,7 @@ export default function OrderDetails() {
                 >
                   <option value="">Select Staff Member</option>
                   {staffList.map(s => (
-                    <option key={s.uid} value={s.displayName || s.email}>{s.displayName || s.email}</option>
+                    <option key={s.id} value={s.displayName || s.email}>{s.displayName || s.email}</option>
                   ))}
                 </select>
               </div>

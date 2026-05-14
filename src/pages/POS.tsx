@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, setDoc, serverTimestamp, query, where, getDocs, updateDoc, doc, increment } from 'firebase/firestore';
-import { Product, SaleItem, Customer, UserProfile, BranchModel } from '@/types/index';
+import { Product, SaleItem, Customer, UserProfile, BranchModel, Staff } from '@/types/index';
 import { Plus, Trash2, Search, UserPlus, User, ChevronDown } from 'lucide-react';
 import { cn, isGlobalUser } from '@/lib/utils';
 import { logActivity } from '@/services/audit';
@@ -31,7 +31,7 @@ export default function POS() {
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'MoMo' | 'Bank Transfer' | ''>('Cash');
   const [accountNumber, setAccountNumber] = useState('');
   const [bankName, setBankName] = useState('');
-  const [staff, setStaff] = useState<UserProfile[]>([]);
+  const [staff, setStaff] = useState<Staff[]>([]);
   const [suppliedBy, setSuppliedBy] = useState('');
   const [currentBranch, setCurrentBranch] = useState<BranchModel | null>(null);
   const [discount, setDiscount] = useState<number>(0);
@@ -68,13 +68,13 @@ export default function POS() {
 
       // Staff Query (Supplied By)
       let staffQ;
-      if (isGlobal) {
-        staffQ = query(collection(db, 'users'));
+      if (userProfile.branchId) {
+        staffQ = query(collection(db, 'staff'), where('branchId', '==', userProfile.branchId));
       } else {
-        staffQ = query(collection(db, 'users'), where('branchId', '==', userProfile.branchId));
+        staffQ = query(collection(db, 'staff'));
       }
       const staffSnapshot = await getDocs(staffQ);
-      setStaff(staffSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() as any } as UserProfile)));
+      setStaff(staffSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as Staff)));
 
       // Branch Info
       if (!isGlobal && userProfile.branchId) {
@@ -490,7 +490,7 @@ export default function POS() {
               >
                 <option value="">Select Staff Member</option>
                 {staff.map(s => (
-                  <option key={s.uid} value={s.displayName || s.email}>{s.displayName || s.email}</option>
+                  <option key={s.id} value={s.displayName || s.email}>{s.displayName || s.email}</option>
                 ))}
               </select>
             </div>
