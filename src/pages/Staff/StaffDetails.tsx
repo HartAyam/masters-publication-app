@@ -36,6 +36,15 @@ export default function StaffDetails() {
     fetchStaff();
   }, [id]);
 
+  useEffect(() => {
+    if (staff && dbBranches.length > 0) {
+      const matchingBranch = dbBranches.find(b => b.id === staff.branchId || b.branchId === staff.branchId || b.name === staff.branchId);
+      if (matchingBranch) {
+        setBranchId(matchingBranch.id);
+      }
+    }
+  }, [staff, dbBranches]);
+
   const fetchStaff = async () => {
     if (!id) return;
     setLoading(true);
@@ -294,7 +303,7 @@ export default function StaffDetails() {
                     value={branchId}
                     onChange={e => setBranchId(e.target.value)}
                   >
-                    {dbBranches.map(b => <option key={b.id} value={b.branchId || b.id}>{b.name}</option>)}
+                    {dbBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
                 </div>
               </div>
@@ -352,7 +361,7 @@ export default function StaffDetails() {
                 <div>
                   <h3 className="text-sm font-medium text-gray-500">Branch</h3>
                   <p className="text-lg font-medium text-gray-900">
-                    {dbBranches.find(b => b.id === staff.branchId || b.name === staff.branchId)?.name || staff.branchId}
+                    {dbBranches.find(b => b.id === staff.branchId || b.branchId === staff.branchId || b.name === staff.branchId)?.name || staff.branchId}
                   </p>
                 </div>
               </div>

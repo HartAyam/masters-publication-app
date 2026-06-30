@@ -180,7 +180,7 @@ export default function ClientDetails() {
               <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                 <span className="px-2 py-0.5 bg-gray-100 rounded text-xs uppercase">{client.type}</span>
                 <span>•</span>
-                <span>{dbBranches.find(b => b.id === client.primaryBranch || b.name === client.primaryBranch)?.name || client.primaryBranch} Branch</span>
+                <span>{dbBranches.find(b => b.id === client.primaryBranch || b.branchId === client.primaryBranch || b.name === client.primaryBranch)?.name || client.primaryBranch} Branch</span>
               </div>
             </div>
           </div>

@@ -69,7 +69,27 @@ export default function POS() {
       // Staff Query (Supplied By)
       let staffQ;
       if (userProfile.branchId) {
-        staffQ = query(collection(db, 'staff'), where('branchId', '==', userProfile.branchId));
+        const branchIdentifiers = [userProfile.branchId];
+        try {
+          const { getDoc } = await import('firebase/firestore');
+          const branchDoc = await getDoc(doc(db, 'branches', userProfile.branchId));
+          if (branchDoc.exists()) {
+            const bData = branchDoc.data();
+            if (bData.branchId) branchIdentifiers.push(bData.branchId);
+            if (bData.name) branchIdentifiers.push(bData.name);
+          } else {
+            const branchNameQ = query(collection(db, 'branches'), where('name', '==', userProfile.branchId));
+            const branchNameSnapshot = await getDocs(branchNameQ);
+            if (!branchNameSnapshot.empty) {
+              const bDoc = branchNameSnapshot.docs[0];
+              if (bDoc.id) branchIdentifiers.push(bDoc.id);
+              if (bDoc.data().branchId) branchIdentifiers.push(bDoc.data().branchId);
+            }
+          }
+        } catch (e) {
+          console.error("Error resolving branch identifiers in POS:", e);
+        }
+        staffQ = query(collection(db, 'staff'), where('branchId', 'in', branchIdentifiers));
       } else {
         staffQ = query(collection(db, 'staff'));
       }
@@ -384,12 +404,12 @@ export default function POS() {
       </div>
 
       {/* Cart & Checkout */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-fit">
         <div className="p-4 border-b border-gray-100 bg-gray-50 rounded-t-xl">
           <h2 className="font-bold text-lg text-gray-900">Current Sale</h2>
         </div>
 
-        <div className="flex-1 p-4 overflow-y-auto space-y-4">
+        <div className="max-h-[180px] p-4 overflow-y-auto space-y-4">
           {cart.length === 0 && (
             <p className="text-center text-gray-400 text-sm py-8">Cart is empty</p>
           )}

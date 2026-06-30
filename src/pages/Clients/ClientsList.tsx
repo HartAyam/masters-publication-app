@@ -191,7 +191,7 @@ export default function ClientsList() {
       Email: c.email || '',
       Address: c.address || '',
       Debt: c.totalDebt,
-      Branch: c.primaryBranch
+      Branch: dbBranches.find(b => b.id === c.primaryBranch || b.branchId === c.primaryBranch || b.name === c.primaryBranch)?.name || c.primaryBranch
     }));
     exportToCSV(dataToExport, `Clients_${format(new Date(), 'yyyy-MM-dd')}`);
   };
@@ -359,7 +359,7 @@ export default function ClientsList() {
                       {client.email && <div className="text-xs text-gray-400"><a href={`mailto:${client.email}`} className="hover:text-blue-600">{client.email}</a></div>}
                     </td>
                     <td className="p-4 text-gray-500">
-                      {dbBranches.find(b => b.id === client.primaryBranch || b.name === client.primaryBranch)?.name || client.primaryBranch}
+                      {dbBranches.find(b => b.id === client.primaryBranch || b.branchId === client.primaryBranch || b.name === client.primaryBranch)?.name || client.primaryBranch}
                     </td>
                     <td className={`p-4 font-medium ${client.totalDebt > 0 ? 'text-red-600' : 'text-gray-900'}`}>
                       {formatCurrency(client.totalDebt)}

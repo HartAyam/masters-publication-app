@@ -55,7 +55,28 @@ export default function StaffList() {
     try {
       let q = query(collection(db, 'staff'));
       if (userProfile?.role === 'Cashier' || userProfile?.role === 'Manager') {
-        q = query(collection(db, 'staff'), where('branchId', '==', userProfile.branchId));
+        const branchIdentifiers = [userProfile.branchId];
+        try {
+          const { getDoc, doc } = await import('firebase/firestore');
+          const branchDoc = await getDoc(doc(db, 'branches', userProfile.branchId));
+          if (branchDoc.exists()) {
+            const bData = branchDoc.data() as any;
+            if (bData.branchId) branchIdentifiers.push(bData.branchId);
+            if (bData.name) branchIdentifiers.push(bData.name);
+          } else {
+            const branchNameQ = query(collection(db, 'branches'), where('name', '==', userProfile.branchId));
+            const branchNameSnapshot = await getDocs(branchNameQ);
+            if (!branchNameSnapshot.empty) {
+              const bDoc = branchNameSnapshot.docs[0];
+              if (bDoc.id) branchIdentifiers.push(bDoc.id);
+              const bData = bDoc.data() as any;
+              if (bData && bData.branchId) branchIdentifiers.push(bData.branchId);
+            }
+          }
+        } catch (e) {
+          console.error("Error resolving branch identifiers in StaffList:", e);
+        }
+        q = query(collection(db, 'staff'), where('branchId', 'in', branchIdentifiers));
       }
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff));
@@ -89,7 +110,7 @@ export default function StaffList() {
 
       // In a real app, you'd trigger a cloud function to create the Auth user.
       // Here we just add the document.
-      const branchName = dbBranches.find(b => b.id === branchId)?.name || branchId;
+      const branchName = dbBranches.find(b => b.id === branchId || b.branchId === branchId)?.name || branchId;
       const staffId = await generateStaffId(branchName, role);
 
       await addDoc(collection(db, 'staff'), {
@@ -155,7 +176,7 @@ export default function StaffList() {
         Name: s.displayName || s.email,
         Email: s.email,
         Role: s.role,
-        Branch: dbBranches.find(b => b.id === s.branchId || b.name === s.branchId)?.name || s.branchId,
+        Branch: dbBranches.find(b => b.id === s.branchId || b.branchId === s.branchId || b.name === s.branchId)?.name || s.branchId,
         Phone: s.phone || 'N/A',
       };
       if (userProfile?.role !== 'Cashier') {
@@ -260,7 +281,7 @@ export default function StaffList() {
                     </span>
                   </td>
                   <td className="p-4 text-gray-500">
-                    {dbBranches.find(b => b.id === user.branchId || b.name === user.branchId)?.name || user.branchId}
+                    {dbBranches.find(b => b.id === user.branchId || b.branchId === user.branchId || b.name === user.branchId)?.name || user.branchId}
                   </td>
                   <td className="p-4 text-gray-400">
                     <button className="hover:text-blue-600">View</button>
@@ -397,7 +418,7 @@ export default function StaffList() {
                     value={branchId}
                     onChange={e => setBranchId(e.target.value)}
                   >
-                    {dbBranches.map(b => <option key={b.id} value={b.branchId || b.id}>{b.name}</option>)}
+                    {dbBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
                 </div>
               </div>

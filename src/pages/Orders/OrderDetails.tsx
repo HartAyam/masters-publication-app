@@ -91,7 +91,27 @@ export default function OrderDetails() {
     try {
       let q;
       if (userProfile?.branchId) {
-        q = query(collection(db, 'staff'), where('branchId', '==', userProfile.branchId));
+        const branchIdentifiers = [userProfile.branchId];
+        try {
+          const { getDoc } = await import('firebase/firestore');
+          const branchDoc = await getDoc(doc(db, 'branches', userProfile.branchId));
+          if (branchDoc.exists()) {
+            const bData = branchDoc.data();
+            if (bData.branchId) branchIdentifiers.push(bData.branchId);
+            if (bData.name) branchIdentifiers.push(bData.name);
+          } else {
+            const branchNameQ = query(collection(db, 'branches'), where('name', '==', userProfile.branchId));
+            const branchNameSnapshot = await getDocs(branchNameQ);
+            if (!branchNameSnapshot.empty) {
+              const bDoc = branchNameSnapshot.docs[0];
+              if (bDoc.id) branchIdentifiers.push(bDoc.id);
+              if (bDoc.data().branchId) branchIdentifiers.push(bDoc.data().branchId);
+            }
+          }
+        } catch (e) {
+          console.error("Error resolving branch identifiers in OrderDetails:", e);
+        }
+        q = query(collection(db, 'staff'), where('branchId', 'in', branchIdentifiers));
       } else {
         q = query(collection(db, 'staff'));
       }

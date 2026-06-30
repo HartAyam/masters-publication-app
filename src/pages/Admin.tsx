@@ -395,7 +395,7 @@ export default function Admin() {
                         </span>
                       </td>
                       <td className="p-4 text-gray-500">
-                        {dbBranches.find(b => b.id === user.branchId || b.name === user.branchId)?.name || user.branchId}
+                        {dbBranches.find(b => b.id === user.branchId || b.branchId === user.branchId || b.name === user.branchId)?.name || user.branchId}
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
