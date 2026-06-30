@@ -132,7 +132,7 @@ export default function FinancialStatements() {
       let totalDepositSales = 0;
       
       transactions.forEach(tx => {
-        if (tx.status === 'Adjusted' || tx.isBackup) return;
+        if (tx.status === 'Adjusted' || tx.status === 'Voided' || tx.isBackup) return;
         if (tx.type === 'Cash Sale' || tx.type === 'Credit Sale' || tx.type === 'Deposit') {
           totalRevenue += tx.totalAmount;
           if (tx.type === 'Cash Sale') totalCashSales += tx.totalAmount;

@@ -31,6 +31,17 @@ export default function OrderDetails() {
   // Adjust state
   const [adjustedItems, setAdjustedItems] = useState<SaleItem[]>([]);
   const [adjustDiscount, setAdjustDiscount] = useState<number>(0);
+  const [adjustPaymentMethod, setAdjustPaymentMethod] = useState<'Cash' | 'MoMo' | 'Bank Transfer'>('Cash');
+  const [adjustAccountNumber, setAdjustAccountNumber] = useState('');
+  const [adjustBankName, setAdjustBankName] = useState('');
+  const [adjustSuppliedBy, setAdjustSuppliedBy] = useState('');
+  const [products, setProducts] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showProductSearch, setShowProductSearch] = useState(false);
+
+  // Void state
+  const [showVoidModal, setShowVoidModal] = useState(false);
+  const [voidReason, setVoidReason] = useState('');
   
   // Return state
   const [returnType, setReturnType] = useState<'Full' | 'Partial'>('Full');
@@ -47,6 +58,10 @@ export default function OrderDetails() {
     if (order) {
       setAdjustedItems([...order.items]);
       setAdjustDiscount(order.discount || 0);
+      setAdjustPaymentMethod(order.paymentMethod || 'Cash');
+      setAdjustAccountNumber(order.accountNumber || '');
+      setAdjustBankName(order.bankName || '');
+      setAdjustSuppliedBy(order.suppliedBy || '');
       setReturnItems(order.items.map(item => ({ ...item, quantity: 0, total: 0 })));
       setSupplyItems(order.items.map(item => ({ 
         ...item, 
@@ -55,6 +70,22 @@ export default function OrderDetails() {
       })));
     }
   }, [order, showAdjustModal, showReturnModal, showSupplyModal]);
+
+  useEffect(() => {
+    if (showAdjustModal) {
+      fetchProducts();
+    }
+  }, [showAdjustModal]);
+
+  const fetchProducts = async () => {
+    try {
+      const q = query(collection(db, 'products'), where('stockLevel', '>', 0));
+      const snapshot = await getDocs(q);
+      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (error) {
+      console.error("Error fetching products:", error);
+    }
+  };
 
   const fetchStaff = async () => {
     try {
@@ -134,15 +165,33 @@ export default function OrderDetails() {
       const newTotalAmount = newSubtotal - newDiscountAmount;
       const amountDiff = order.totalAmount - newTotalAmount;
 
-      // 3. Update stock
+      // 3. Update stock for all items
+      // a. Adjust stock for original items (either changed or removed)
       for (const originalItem of order.items) {
         const adjustedItem = adjustedItems.find(i => i.productId === originalItem.productId);
-        const qtyDiff = originalItem.quantity - (adjustedItem ? adjustedItem.quantity : 0);
-        
-        if (qtyDiff !== 0) {
+        if (!adjustedItem) {
           const productRef = doc(db, 'products', originalItem.productId);
           await updateDoc(productRef, {
-            stockLevel: increment(qtyDiff)
+            stockLevel: increment(originalItem.quantity)
+          });
+        } else {
+          const qtyDiff = originalItem.quantity - adjustedItem.quantity;
+          if (qtyDiff !== 0) {
+            const productRef = doc(db, 'products', originalItem.productId);
+            await updateDoc(productRef, {
+              stockLevel: increment(qtyDiff)
+            });
+          }
+        }
+      }
+
+      // b. Deduct stock for new items added
+      for (const adjustedItem of adjustedItems) {
+        const isNew = !order.items.some(i => i.productId === adjustedItem.productId);
+        if (isNew) {
+          const productRef = doc(db, 'products', adjustedItem.productId);
+          await updateDoc(productRef, {
+            stockLevel: increment(-adjustedItem.quantity)
           });
         }
       }
@@ -162,6 +211,10 @@ export default function OrderDetails() {
         totalAmount: newTotalAmount,
         discount: adjustDiscount,
         balanceDue: order.type === 'Credit Sale' ? newTotalAmount - order.amountPaid : Math.max(0, newTotalAmount - order.amountPaid),
+        paymentMethod: adjustPaymentMethod,
+        accountNumber: adjustPaymentMethod === 'Cash' ? '' : adjustAccountNumber,
+        bankName: adjustPaymentMethod === 'Cash' ? '' : adjustBankName,
+        suppliedBy: adjustSuppliedBy,
         isAdjusted: true,
         adjustmentDate: serverTimestamp()
       });
@@ -185,6 +238,82 @@ export default function OrderDetails() {
     } catch (error) {
       console.error("Adjustment failed:", error);
       alert('Adjustment failed');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleVoid = async () => {
+    if (!order || processing || !voidReason.trim()) {
+      alert("Please enter a valid reason for voiding.");
+      return;
+    }
+    setProcessing(true);
+    try {
+      // 1. Create backup of original
+      const { id: _, ...orderData } = order;
+      Object.keys(orderData).forEach(key => {
+        if ((orderData as any)[key] === undefined) {
+          delete (orderData as any)[key];
+        }
+      });
+
+      const backupData = {
+        ...orderData,
+        isBackup: true,
+        status: 'Voided' as const,
+        originalTransactionId: order.id,
+        voidReason: voidReason,
+        voidDate: serverTimestamp(),
+        voidedBy: userProfile?.displayName || userProfile?.email || 'System'
+      };
+      await addDoc(collection(db, 'transactions'), backupData);
+
+      // 2. Adjust inventory (add back quantities)
+      for (const item of order.items) {
+        const productRef = doc(db, 'products', item.productId);
+        await updateDoc(productRef, {
+          stockLevel: increment(item.quantity)
+        });
+      }
+
+      // 3. Subtract customer debt if credit sale and balance due > 0
+      if (order.type === 'Credit Sale' && order.customerId && order.balanceDue > 0) {
+        const customerRef = doc(db, 'customers', order.customerId);
+        await updateDoc(customerRef, {
+          totalDebt: increment(-order.balanceDue)
+        });
+      }
+
+      // 4. Update current transaction
+      const transactionRef = doc(db, 'transactions', order.id);
+      await updateDoc(transactionRef, {
+        status: 'Voided' as const,
+        voidReason: voidReason,
+        voidDate: serverTimestamp(),
+        voidedBy: userProfile?.displayName || userProfile?.email || 'System'
+      });
+
+      // 5. Log Activity
+      if (userProfile) {
+        await logActivity(
+          'Invoice Voided',
+          `Order ${order.id} voided. Reason: ${voidReason}`,
+          userProfile.uid,
+          userProfile.role,
+          userProfile.branchId,
+          userProfile.displayName,
+          userProfile.email
+        );
+      }
+
+      setShowVoidModal(false);
+      setVoidReason('');
+      fetchOrder(order.id);
+      alert('Invoice voided successfully');
+    } catch (error) {
+      console.error("Voiding failed:", error);
+      alert('Voiding failed');
     } finally {
       setProcessing(false);
     }
@@ -419,33 +548,55 @@ export default function OrderDetails() {
             <Download size={18} />
             Download
           </button>
-          <button 
-            onClick={() => setShowAdjustModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 hover:bg-amber-100 transition-colors"
-          >
-            <AlertCircle size={18} />
-            Adjust
-          </button>
-          <button 
-            onClick={() => setShowReturnModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 hover:bg-rose-100 transition-colors"
-          >
-            <ShoppingCart size={18} />
-            Return
-          </button>
-          {order.type === 'Deposit' && order.status !== 'Supplied' && (
-            <button 
-              onClick={() => setShowSupplyModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg text-green-700 hover:bg-green-100 transition-colors"
-            >
-              <CheckCircle2 size={18} />
-              Supply Items
-            </button>
+          {order.status !== 'Voided' && (
+            <>
+              <button 
+                onClick={() => setShowAdjustModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 hover:bg-amber-100 transition-colors"
+              >
+                <AlertCircle size={18} />
+                Adjust
+              </button>
+              <button 
+                onClick={() => setShowReturnModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 hover:bg-rose-100 transition-colors"
+              >
+                <ShoppingCart size={18} />
+                Return
+              </button>
+              {order.type === 'Deposit' && order.status !== 'Supplied' && (
+                <button 
+                  onClick={() => setShowSupplyModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg text-green-700 hover:bg-green-100 transition-colors"
+                >
+                  <CheckCircle2 size={18} />
+                  Supply Items
+                </button>
+              )}
+              <button 
+                onClick={() => setShowVoidModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-red-700 hover:bg-red-100 transition-colors"
+              >
+                <X size={18} />
+                Void
+              </button>
+            </>
           )}
         </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative" id="invoice-print">
+        {order.status === 'Voided' && (
+          <div className="bg-red-600 text-white text-center py-4 px-6 relative z-20">
+            <div className="text-xl font-black tracking-[0.25em] uppercase">VOIDED INVOICE</div>
+            {order.voidReason && (
+              <div className="mt-1 text-sm opacity-90 font-medium">
+                <span className="font-bold">Reason:</span> {order.voidReason}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Watermark */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05] z-0">
           <img src="/logo.png" alt="" className="w-1/2 object-contain" />
@@ -677,6 +828,116 @@ export default function OrderDetails() {
                   })}
                 </tbody>
               </table>
+              {/* Product Selection for Adding New Items */}
+              <div className="mt-6 border-t border-gray-100 pt-4">
+                <h3 className="text-sm font-bold text-gray-900 mb-2">Add New Item</h3>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search product to add..."
+                    className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setShowProductSearch(true);
+                    }}
+                    onFocus={() => setShowProductSearch(true)}
+                  />
+                  
+                  {showProductSearch && searchTerm.trim() && (
+                    <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto z-10">
+                      {products
+                        .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                        .map(p => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm flex justify-between items-center"
+                            onClick={() => {
+                              const existing = adjustedItems.find(item => item.productId === p.id);
+                              if (existing) {
+                                alert("This product is already in the list. Please adjust its quantity instead.");
+                              } else {
+                                const newItem: SaleItem = {
+                                  productId: p.id,
+                                  productName: p.name,
+                                  quantity: 1,
+                                  price: p.sellingPrice || 0,
+                                  total: p.sellingPrice || 0
+                                };
+                                setAdjustedItems(prev => [...prev, newItem]);
+                              }
+                              setSearchTerm('');
+                              setShowProductSearch(false);
+                            }}
+                          >
+                            <span>{p.name}</span>
+                            <span className="text-xs font-mono text-gray-500">Stock: {p.stockLevel} • GHS {p.sellingPrice}</span>
+                          </button>
+                        ))
+                      }
+                      {products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
+                        <div className="px-4 py-2 text-xs text-gray-500 text-center">No products found</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Payment Details and Supplied By edits */}
+              <div className="mt-6 border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Supplied By</label>
+                  <select
+                    className="w-full p-2 border border-gray-200 rounded-lg text-sm"
+                    value={adjustSuppliedBy}
+                    onChange={(e) => setAdjustSuppliedBy(e.target.value)}
+                  >
+                    <option value="">Select Staff</option>
+                    {staffList.map(s => (
+                      <option key={s.id} value={s.displayName || s.email}>{s.displayName || s.email}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Payment Method</label>
+                  <select
+                    className="w-full p-2 border border-gray-200 rounded-lg text-sm"
+                    value={adjustPaymentMethod}
+                    onChange={(e) => setAdjustPaymentMethod(e.target.value as any)}
+                  >
+                    <option value="Cash">Cash</option>
+                    <option value="MoMo">MoMo</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                  </select>
+                </div>
+
+                {adjustPaymentMethod !== 'Cash' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Account Number</label>
+                      <input
+                        type="text"
+                        className="w-full p-2 border border-gray-200 rounded-lg text-sm"
+                        value={adjustAccountNumber}
+                        onChange={(e) => setAdjustAccountNumber(e.target.value)}
+                        placeholder="e.g. 0244000000"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Bank / Network Name</label>
+                      <input
+                        type="text"
+                        className="w-full p-2 border border-gray-200 rounded-lg text-sm"
+                        value={adjustBankName}
+                        onChange={(e) => setAdjustBankName(e.target.value)}
+                        placeholder="e.g. MTN or GCB"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
             
             <div className="p-6 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
@@ -945,6 +1206,57 @@ export default function OrderDetails() {
                   {processing ? 'Processing...' : 'Confirm Supply'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Void Modal */}
+      {showVoidModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden text-left">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-red-50">
+              <h2 className="font-bold text-red-900 flex items-center gap-2">
+                <AlertCircle size={20} />
+                Void Invoice
+              </h2>
+              <button onClick={() => { setShowVoidModal(false); setVoidReason(''); }} className="text-gray-400 hover:text-gray-600">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-500">
+                Are you sure you want to void this invoice? This action will remove it from all calculations, restore stock levels of its items, and reduce the customer's debt. This action is irreversible.
+              </p>
+              
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Reason for Voiding</label>
+                <textarea
+                  required
+                  rows={3}
+                  className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="e.g. Returned items, wrong invoice details, etc."
+                  value={voidReason}
+                  onChange={(e) => setVoidReason(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+              <button 
+                onClick={() => { setShowVoidModal(false); setVoidReason(''); }}
+                className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleVoid}
+                disabled={processing || !voidReason.trim()}
+                className="px-6 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {processing ? 'Processing...' : 'Confirm Void'}
+              </button>
             </div>
           </div>
         </div>

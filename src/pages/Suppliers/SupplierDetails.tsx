@@ -6,11 +6,13 @@ import { doc, getDoc, collection, query, where, orderBy, getDocs, deleteDoc } fr
 import { Supplier, Expense } from '@/types';
 import { ArrowLeft, User, Building, Phone, Mail, MapPin, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/idUtils';
+import { useBranches } from '@/hooks/useBranches';
 
 export default function SupplierDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { userProfile } = useAuth();
+  const { branches: dbBranches } = useBranches();
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,7 +97,7 @@ export default function SupplierDetails() {
               <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                 <span className="px-2 py-0.5 bg-gray-100 rounded text-xs uppercase">{supplier.type}</span>
                 <span>•</span>
-                <span>{supplier.primaryBranch} Branch</span>
+                <span>{dbBranches.find(b => b.id === supplier.primaryBranch || b.name === supplier.primaryBranch)?.name || supplier.primaryBranch} Branch</span>
               </div>
             </div>
           </div>

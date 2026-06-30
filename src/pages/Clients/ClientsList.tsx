@@ -34,6 +34,7 @@ export default function ClientsList() {
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [primaryBranch, setPrimaryBranch] = useState<string>('');
+  const [openingBalance, setOpeningBalance] = useState<string>('');
 
   useEffect(() => {
     if (dbBranches.length > 0 && !primaryBranch) {
@@ -101,6 +102,7 @@ export default function ClientsList() {
         email,
         address,
         primaryBranch: isGlobalUser(userProfile.role) ? primaryBranch : userProfile.branchId,
+        openingBalance: parseFloat(openingBalance) || 0,
       };
 
       if (type === 'Organization') {
@@ -113,12 +115,17 @@ export default function ClientsList() {
       }
 
       if (editingClient) {
+        const prevOpeningBalance = editingClient.openingBalance || 0;
+        const newOpeningBalance = parseFloat(openingBalance) || 0;
+        const debtDiff = newOpeningBalance - prevOpeningBalance;
+        clientData.totalDebt = (editingClient.totalDebt || 0) + debtDiff;
+
         await updateDoc(doc(db, 'customers', editingClient.id), clientData);
         alert('Client updated successfully');
       } else {
         await addDoc(collection(db, 'customers'), {
           ...clientData,
-          totalDebt: 0,
+          totalDebt: parseFloat(openingBalance) || 0,
           createdAt: serverTimestamp(),
         });
         alert('Client created successfully');
@@ -142,6 +149,7 @@ export default function ClientsList() {
       setEmail(client.email || '');
       setAddress(client.address || '');
       setPrimaryBranch(client.primaryBranch);
+      setOpeningBalance(client.openingBalance !== undefined ? client.openingBalance.toString() : '');
       if (client.contactPerson) {
         setContactName(client.contactPerson.name);
         setContactPhone(client.contactPerson.phone);
@@ -160,6 +168,7 @@ export default function ClientsList() {
       setPhone('');
       setEmail('');
       setAddress('');
+      setOpeningBalance('');
       setPrimaryBranch(isGlobalUser(userProfile?.role || '') ? (dbBranches[0]?.id || '') : userProfile?.branchId || (dbBranches[0]?.id || ''));
       setContactName('');
       setContactPhone('');
@@ -445,6 +454,18 @@ export default function ClientsList() {
                   rows={2}
                   value={address}
                   onChange={e => setAddress(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Opening Balance (GHS)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="w-full p-2 border border-gray-200 rounded-lg"
+                  value={openingBalance}
+                  onChange={e => setOpeningBalance(e.target.value)}
+                  placeholder="0.00"
                 />
               </div>
 

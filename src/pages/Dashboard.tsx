@@ -52,13 +52,7 @@ export default function Dashboard() {
   const [paymentsCurrentPage, setPaymentsCurrentPage] = useState(1);
   const [expensesCurrentPage, setExpensesCurrentPage] = useState(1);
   const itemsPerPage = 20;
-  
-  // Filters
-  const [dateRange, setDateRange] = useState({
-    start: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
-    end: format(new Date(), 'yyyy-MM-dd')
-  });
-  const [selectedBranch, setSelectedBranch] = useState<string | 'ALL'>(isGlobalUser(userProfile?.role) ? 'ALL' : (userProfile?.branchId || 'ALL'));
+  const [salesTimeframe, setSalesTimeframe] = useState<'Daily' | 'Weekly'>('Daily');
 
   const [stats, setStats] = useState<DashboardStats>({
     totalRevenue: 0,
@@ -78,6 +72,46 @@ export default function Dashboard() {
     salesByDate: [],
     salesByBranch: []
   });
+
+  const salesByBranchWithNames = useMemo(() => {
+    return stats.salesByBranch.map(s => {
+      const branchName = dbBranches.find(b => b.id === s.name || b.name === s.name)?.name || s.name;
+      return {
+        ...s,
+        name: branchName
+      };
+    });
+  }, [stats.salesByBranch, dbBranches]);
+
+  const salesChartData = useMemo(() => {
+    if (salesTimeframe === 'Daily') {
+      return stats.salesByDate;
+    }
+    
+    // Group stats.salesByDate by week starting date
+    const weeklyMap = new Map<string, { date: string; amount: number; timestamp: number }>();
+    
+    stats.salesByDate.forEach(item => {
+      const dateObj = new Date((item as any).timestamp || Date.now());
+      const weekStartObj = startOfWeek(dateObj);
+      const weekEndObj = endOfWeek(dateObj);
+      const weekKey = format(weekStartObj, 'yyyy-MM-dd');
+      
+      const displayDate = `${format(weekStartObj, 'MMM dd')} - ${format(weekEndObj, 'MMM dd')}`;
+      const existing = weeklyMap.get(weekKey) || { date: displayDate, amount: 0, timestamp: weekStartObj.getTime() };
+      existing.amount += item.amount;
+      weeklyMap.set(weekKey, existing);
+    });
+    
+    return Array.from(weeklyMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+  }, [stats.salesByDate, salesTimeframe]);
+  
+  // Filters
+  const [dateRange, setDateRange] = useState({
+    start: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
+    end: format(new Date(), 'yyyy-MM-dd')
+  });
+  const [selectedBranch, setSelectedBranch] = useState<string | 'ALL'>(isGlobalUser(userProfile?.role) ? 'ALL' : (userProfile?.branchId || 'ALL'));
 
   const isPrivileged = isGlobalUser(userProfile?.role);
 
@@ -198,7 +232,7 @@ export default function Dashboard() {
         let depositSales = 0;
 
         transactions.forEach(t => {
-          if (t.status === 'Adjusted' || t.isBackup) return;
+          if (t.status === 'Adjusted' || t.status === 'Voided' || t.isBackup) return;
           const amount = t.totalAmount || 0;
           if (t.type === 'Cash Sale') {
             cashSales += amount;
@@ -221,7 +255,7 @@ export default function Dashboard() {
         // Top Customers
         const customerMap = new Map<string, { id?: string; name: string; total: number; count: number }>();
         transactions.forEach(t => {
-          if (t.status === 'Adjusted' || t.isBackup) return;
+          if (t.status === 'Adjusted' || t.status === 'Voided' || t.isBackup) return;
           if (t.customerName) {
             const key = t.customerId || t.customerName;
             const existing = customerMap.get(key) || { id: t.customerId, name: t.customerName, total: 0, count: 0 };
@@ -237,7 +271,7 @@ export default function Dashboard() {
         // Sales Over Time
         const salesByDateMap = new Map<string, { date: string; amount: number; timestamp: number }>();
         transactions.forEach(t => {
-          if (t.status === 'Adjusted' || t.isBackup) return;
+          if (t.status === 'Adjusted' || t.status === 'Voided' || t.isBackup) return;
           if (!t.date || !t.date.toDate) return;
           const dateObj = t.date.toDate();
           const dateKey = format(dateObj, 'yyyy-MM-dd');
@@ -252,7 +286,7 @@ export default function Dashboard() {
         // Sales By Branch
         const salesByBranchMap = new Map<string, number>();
         transactions.forEach(t => {
-          if (t.status === 'Adjusted' || t.isBackup) return;
+          if (t.status === 'Adjusted' || t.status === 'Voided' || t.isBackup) return;
           salesByBranchMap.set(t.branchId, (salesByBranchMap.get(t.branchId) || 0) + t.totalAmount);
         });
         const salesByBranch = Array.from(salesByBranchMap.entries())
@@ -539,48 +573,69 @@ export default function Dashboard() {
         ))}
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Sales Chart */}
+      {/* Sales Chart (Full Width) */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 w-full"
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-gray-900">Sales Over Time</h2>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setSalesTimeframe('Daily')}
+              className={cn(
+                "px-3 py-1 text-xs font-medium rounded-lg transition-colors",
+                salesTimeframe === 'Daily' 
+                  ? "bg-blue-50 text-blue-600 font-bold" 
+                  : "text-gray-400 hover:bg-gray-50"
+              )}
+            >
+              Daily
+            </button>
+            <button 
+              onClick={() => setSalesTimeframe('Weekly')}
+              className={cn(
+                "px-3 py-1 text-xs font-medium rounded-lg transition-colors",
+                salesTimeframe === 'Weekly' 
+                  ? "bg-blue-50 text-blue-600 font-bold" 
+                  : "text-gray-400 hover:bg-gray-50"
+              )}
+            >
+              Weekly
+            </button>
+          </div>
+        </div>
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={salesChartData}>
+              <defs>
+                <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
+              <Tooltip 
+                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                cursor={{ fill: '#f3f4f6' }}
+              />
+              <Bar dataKey="amount" fill="url(#colorSales)" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </motion.div>
+
+      {/* Restock Meter & Branch Sales (2-grid arrangement) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Restock Meter */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-gray-900">Sales Over Time</h2>
-            <div className="flex gap-2">
-              <button className="px-3 py-1 text-xs font-medium bg-blue-50 text-blue-600 rounded-lg">Daily</button>
-              <button className="px-3 py-1 text-xs font-medium text-gray-400 hover:bg-gray-50 rounded-lg">Weekly</button>
-            </div>
-          </div>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.salesByDate}>
-                <defs>
-                  <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
-                  cursor={{ fill: '#f3f4f6' }}
-                />
-                <Bar dataKey="amount" fill="url(#colorSales)" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Restock Meter */}
-        <motion.div 
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
           className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
         >
           <div className="flex items-center justify-between mb-6">
@@ -623,9 +678,60 @@ export default function Dashboard() {
             View Full Inventory
           </button>
         </motion.div>
+
+        {/* Branch Comparison (Privileged Only) */}
+        <motion.div 
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
+        >
+          <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <ShoppingCart size={20} className="text-emerald-500" />
+            Branch Sales
+          </h2>
+          {isPrivileged ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={salesByBranchWithNames}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="amount"
+                  >
+                    {salesByBranchWithNames.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#ef4444'][index % 4]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend verticalAlign="bottom" height={36}/>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <Info className="text-gray-300 mb-2" size={32} />
+              <p className="text-sm text-gray-400">Restricted to Admin/Accountant</p>
+            </div>
+          )}
+          
+          <div className="mt-6 space-y-3">
+            {salesByBranchWithNames.map((b, i) => (
+              <div key={i} className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">{b.name}</span>
+                <span className="font-bold text-gray-900">{formatCurrency(b.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Top Customers & Top Debtors (2-grid columns, widened) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Customers */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
@@ -695,7 +801,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <p className="text-sm font-bold text-gray-900">{debtor.name}</p>
-                      <p className="text-xs text-gray-500">{debtor.primaryBranch}</p>
+                      <p className="text-xs text-gray-500">{dbBranches.find(b => b.id === debtor.primaryBranch || b.name === debtor.primaryBranch)?.name || debtor.primaryBranch}</p>
                     </div>
                   </div>
                   <p className="text-sm font-bold text-rose-600">{formatCurrency(debtor.totalDebt)}</p>
@@ -704,56 +810,7 @@ export default function Dashboard() {
             )}
           </div>
         </motion.div>
-
-        {/* Branch Comparison (Privileged Only) */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
-          className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
-        >
-          <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <ShoppingCart size={20} className="text-emerald-500" />
-            Branch Sales
-          </h2>
-          {isPrivileged ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={stats.salesByBranch}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="amount"
-                  >
-                    {stats.salesByBranch.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#ef4444'][index % 4]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend verticalAlign="bottom" height={36}/>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-center">
-              <Info className="text-gray-300 mb-2" size={32} />
-              <p className="text-sm text-gray-400">Restricted to Admin/Accountant</p>
-            </div>
-          )}
-          
-          <div className="mt-6 space-y-3">
-            {stats.salesByBranch.map((b, i) => (
-              <div key={i} className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">{b.name}</span>
-                <span className="font-bold text-gray-900">{formatCurrency(b.amount)}</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
+      </div>
 
         {/* Recent Payments */}
         <motion.div 
@@ -885,7 +942,7 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.8 }}
-            className="lg:col-span-3 bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
+            className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
           >
             <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
               <Clock size={20} className="text-purple-500" />
@@ -895,12 +952,12 @@ export default function Dashboard() {
               <table className="w-full text-left text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    <th className="p-4 font-medium text-gray-600 text-left">Date</th>
-                    <th className="p-4 font-medium text-gray-600 text-left">User</th>
-                    <th className="p-4 font-medium text-gray-600 text-left">Action</th>
-                    <th className="p-4 font-medium text-gray-600 text-left">Details</th>
-                    <th className="p-4 font-medium text-gray-600 text-left">User Role</th>
-                    <th className="p-4 font-medium text-gray-600 text-left">Branch</th>
+                    <th className="p-4 font-medium text-gray-600 text-left min-w-[120px]">Date</th>
+                    <th className="p-4 font-medium text-gray-600 text-left min-w-[180px]">User</th>
+                    <th className="p-4 font-medium text-gray-600 text-left min-w-[180px]">Action</th>
+                    <th className="p-4 font-medium text-gray-600 text-left min-w-[300px]">Details</th>
+                    <th className="p-4 font-medium text-gray-600 text-left min-w-[150px]">User Role</th>
+                    <th className="p-4 font-medium text-gray-600 text-left min-w-[180px]">Branch</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -911,24 +968,24 @@ export default function Dashboard() {
                   ) : (
                     paginatedActivities.map((activity) => (
                       <tr key={activity.id} className="hover:bg-gray-50">
-                        <td className="p-4 text-gray-500 whitespace-nowrap">
+                        <td className="p-4 text-gray-500 whitespace-nowrap min-w-[120px]">
                           {activity.timestamp?.toDate ? format(activity.timestamp.toDate(), 'MMM dd, HH:mm') : 'N/A'}
                         </td>
-                        <td className="p-4 text-gray-900 font-medium">
+                        <td className="p-4 text-gray-900 font-medium min-w-[180px]">
                           {activity.displayName || (activity as any).userName || usersMap[activity.userId] || activity.userId}
                         </td>
-                        <td className="p-4">
+                        <td className="p-4 min-w-[180px]">
                           <span className="text-xs font-bold text-purple-600 uppercase tracking-wider bg-purple-50 px-2 py-1 rounded-md">
                             {activity.action}
                           </span>
                         </td>
-                        <td className="p-4 text-gray-700">{activity.details}</td>
-                        <td className="p-4 text-gray-500">
+                        <td className="p-4 text-gray-700 min-w-[300px]">{activity.details}</td>
+                        <td className="p-4 text-gray-500 min-w-[150px]">
                           <span className="px-2 py-1 bg-gray-100 rounded-full text-xs">
                             {activity.userRole}
                           </span>
                         </td>
-                        <td className="p-4 text-gray-500">
+                        <td className="p-4 text-gray-500 min-w-[180px]">
                           {dbBranches.find(b => b.id === activity.branchId || b.name === activity.branchId)?.name || activity.branchId}
                         </td>
                       </tr>
@@ -949,6 +1006,5 @@ export default function Dashboard() {
           </motion.div>
         )}
       </div>
-    </div>
   );
 }

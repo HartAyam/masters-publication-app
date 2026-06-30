@@ -68,6 +68,7 @@ export interface Customer {
   address?: string;
   contactPerson?: ContactPerson;
   totalDebt: number;
+  openingBalance?: number;
   primaryBranch: Branch;
   createdAt: any;
 }
@@ -85,7 +86,7 @@ export interface Order {
   customerId?: string;
   customerName?: string;
   customerPhone?: string;
-  status: 'Completed' | 'Pending Delivery' | 'Pending Payment' | 'Returned' | 'Adjusted' | 'Partially Supplied' | 'Supplied';
+  status: 'Completed' | 'Pending Delivery' | 'Pending Payment' | 'Returned' | 'Adjusted' | 'Partially Supplied' | 'Supplied' | 'Voided';
   date: any; // Firestore Timestamp
   cashierId: string;
   preparedBy: string;
@@ -99,6 +100,9 @@ export interface Order {
   adjustmentDate?: any;
   originalTransactionId?: string;
   isBackup?: boolean;
+  voidReason?: string;
+  voidDate?: any;
+  voidedBy?: string;
 }
 
 export interface Payment {
