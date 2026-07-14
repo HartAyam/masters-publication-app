@@ -103,6 +103,7 @@ export interface Order {
   voidReason?: string;
   voidDate?: any;
   voidedBy?: string;
+  previousBalance?: number;
 }
 
 export interface Payment {

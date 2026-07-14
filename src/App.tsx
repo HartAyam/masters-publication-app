@@ -79,7 +79,18 @@ const SetupRequired = () => (
 import ErrorBoundary from '@/components/common/ErrorBoundary';
 
 const AppRoutes = () => {
-  const { isConfigured, error } = useAuth();
+  const { isConfigured, error, user, userProfile } = useAuth();
+
+  React.useEffect(() => {
+    if (isConfigured && user && userProfile) {
+      const allowedRoles = ['Admin', 'Director', 'Accountant'];
+      if (allowedRoles.includes(userProfile.role)) {
+        import('@/lib/migration').then(({ runInvoiceMigration }) => {
+          runInvoiceMigration();
+        });
+      }
+    }
+  }, [isConfigured, user, userProfile]);
 
   if (!isConfigured) {
     return <SetupRequired />;

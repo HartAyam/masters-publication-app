@@ -226,11 +226,12 @@ export default function OrderDetails() {
 
       // 5. Update current transaction
       const transactionRef = doc(db, 'transactions', order.id);
+      const prevBal = order.previousBalance !== undefined ? order.previousBalance : 0;
       await updateDoc(transactionRef, {
         items: adjustedItems,
         totalAmount: newTotalAmount,
         discount: adjustDiscount,
-        balanceDue: order.type === 'Credit Sale' ? newTotalAmount - order.amountPaid : Math.max(0, newTotalAmount - order.amountPaid),
+        balanceDue: order.type === 'Credit Sale' ? newTotalAmount - prevBal : Math.max(0, newTotalAmount - order.amountPaid),
         paymentMethod: adjustPaymentMethod,
         accountNumber: adjustPaymentMethod === 'Cash' ? '' : adjustAccountNumber,
         bankName: adjustPaymentMethod === 'Cash' ? '' : adjustBankName,
@@ -297,11 +298,11 @@ export default function OrderDetails() {
         });
       }
 
-      // 3. Subtract customer debt if credit sale and balance due > 0
-      if (order.type === 'Credit Sale' && order.customerId && order.balanceDue > 0) {
+      // 3. Subtract customer debt if credit sale
+      if (order.type === 'Credit Sale' && order.customerId) {
         const customerRef = doc(db, 'customers', order.customerId);
         await updateDoc(customerRef, {
-          totalDebt: increment(-order.balanceDue)
+          totalDebt: increment(-order.totalAmount)
         });
       }
 
@@ -543,6 +544,10 @@ export default function OrderDetails() {
     exportToCSV(data, `Invoice_${order.id}`);
   };
 
+  const previousBalance = order.previousBalance !== undefined 
+    ? order.previousBalance 
+    : (customer ? -customer.totalDebt : 0);
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -729,17 +734,25 @@ export default function OrderDetails() {
                 <td colSpan={3} className="py-2 text-right text-xs font-black uppercase tracking-widest text-gray-900">Total Amount</td>
                 <td className="py-2 text-right text-base font-black text-gray-900">{formatCurrency(order.totalAmount)}</td>
               </tr>
+              {previousBalance !== 0 && (
+                <tr>
+                  <td colSpan={3} className="py-1 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Previous Balance</td>
+                  <td className={cn(
+                    "py-1 text-right text-xs font-bold",
+                    previousBalance < 0 ? "text-red-600" : "text-green-600"
+                  )}>
+                    {previousBalance < 0 ? '-' : '+'}
+                    {formatCurrency(Math.abs(previousBalance))}
+                  </td>
+                </tr>
+              )}
               {order.type === 'Credit Sale' && (
-                <>
-                  <tr>
-                    <td colSpan={3} className="py-1 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Payment/Credits</td>
-                    <td className="py-1 text-right text-xs font-bold text-gray-700">{formatCurrency(customer?.totalDebt || 0)}</td>
-                  </tr>
-                  <tr className="bg-gray-900 text-white">
-                    <td colSpan={3} className="py-2 text-right text-xs font-black uppercase tracking-widest px-4">Balance Due</td>
-                    <td className="py-2 text-right text-base font-black px-4">{formatCurrency(customer?.totalDebt || 0)}</td>
-                  </tr>
-                </>
+                <tr className="bg-gray-900 text-white">
+                  <td colSpan={3} className="py-2 text-right text-xs font-black uppercase tracking-widest px-4">Balance Due</td>
+                  <td className="py-2 text-right text-base font-black px-4">
+                    {formatCurrency(order.balanceDue !== undefined ? order.balanceDue : (order.totalAmount - previousBalance))}
+                  </td>
+                </tr>
               )}
             </tfoot>
           </table>

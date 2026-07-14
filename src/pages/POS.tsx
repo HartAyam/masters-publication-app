@@ -259,12 +259,13 @@ export default function POS() {
       // Determine Status and Payment
       let status = 'Completed';
       let amountPaid = totalAmount;
+      const previousBalance = selectedCustomer ? -selectedCustomer.totalDebt : 0;
       let balanceDue = 0;
 
       if (transactionType === 'Credit Sale') {
         status = 'Pending Payment';
         amountPaid = 0;
-        balanceDue = totalAmount;
+        balanceDue = totalAmount - previousBalance;
       } else if (transactionType === 'Deposit') {
         status = 'Pending Delivery';
         // For deposit, we assume full payment for now, but stock is reserved
@@ -295,6 +296,7 @@ export default function POS() {
         paymentMethod,
         accountNumber: (paymentMethod === 'MoMo' || paymentMethod === 'Bank Transfer') ? accountNumber : null,
         bankName: (paymentMethod === 'MoMo' || paymentMethod === 'Bank Transfer') ? bankName : null,
+        previousBalance,
       };
 
       await setDoc(doc(db, 'transactions', invoiceId), transactionData);
