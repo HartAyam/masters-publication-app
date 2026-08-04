@@ -30,7 +30,7 @@ export default function StaffDetails() {
   const [ghanaCardNo, setGhanaCardNo] = useState('');
 
   const canEdit = ['Admin', 'Director', 'Accountant'].includes(userProfile?.role || '');
-  const canDelete = true; // Granted access to all roles for the delete functionality
+  const canDelete = ['Admin', 'Director', 'Accountant'].includes(userProfile?.role || '');
 
   useEffect(() => {
     fetchStaff();

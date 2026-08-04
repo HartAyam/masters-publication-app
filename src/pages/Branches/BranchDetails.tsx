@@ -143,7 +143,7 @@ export default function BranchDetails() {
                 Edit Branch
               </button>
             )}
-            {!isEditing && (
+            {canEdit && !isEditing && (
               <button
                 onClick={handleDelete}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"

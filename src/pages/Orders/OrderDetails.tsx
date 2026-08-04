@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '../../lib/firebase';
 import { doc, getDoc, updateDoc, addDoc, setDoc, collection, serverTimestamp, increment, query, where, getDocs, Timestamp } from 'firebase/firestore';
-import { Transaction, SaleItem, Customer, BranchModel, UserProfile, Staff } from '../../types';
+import { Transaction, SaleItem, Customer, BranchModel, UserProfile, Staff, Product } from '../../types';
 import { ArrowLeft, Printer, Download, Calendar, User, CreditCard, MapPin, X, Trash2, AlertCircle, CheckCircle2, ShoppingCart, Mail, Phone, Building } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { logActivity } from '@/services/audit';
@@ -81,7 +81,33 @@ export default function OrderDetails() {
     try {
       const q = query(collection(db, 'products'), where('stockLevel', '>', 0));
       const snapshot = await getDocs(q);
-      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      let list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+
+      if (userProfile?.branchId) {
+        const branchIdentifiers = new Set<string>([userProfile.branchId]);
+        try {
+          const { getDoc } = await import('firebase/firestore');
+          const branchDoc = await getDoc(doc(db, 'branches', userProfile.branchId));
+          if (branchDoc.exists()) {
+            const bData = branchDoc.data();
+            if (bData.branchId) branchIdentifiers.add(bData.branchId);
+            if (bData.name) branchIdentifiers.add(bData.name);
+          } else {
+            const branchNameQ = query(collection(db, 'branches'), where('name', '==', userProfile.branchId));
+            const branchNameSnapshot = await getDocs(branchNameQ);
+            if (!branchNameSnapshot.empty) {
+              const bDoc = branchNameSnapshot.docs[0];
+              if (bDoc.id) branchIdentifiers.add(bDoc.id);
+              if (bDoc.data().branchId) branchIdentifiers.add(bDoc.data().branchId);
+            }
+          }
+        } catch (e) {
+          console.error("Error resolving branch identifiers in fetchProducts:", e);
+        }
+        list = list.filter(p => p.branchId && branchIdentifiers.has(p.branchId));
+      }
+
+      setProducts(list);
     } catch (error) {
       console.error("Error fetching products:", error);
     }
@@ -891,12 +917,13 @@ export default function OrderDetails() {
                               if (existing) {
                                 alert("This product is already in the list. Please adjust its quantity instead.");
                               } else {
+                                const itemPrice = p.price ?? (p as any).sellingPrice ?? 0;
                                 const newItem: SaleItem = {
                                   productId: p.id,
                                   productName: p.name,
                                   quantity: 1,
-                                  price: p.sellingPrice || 0,
-                                  total: p.sellingPrice || 0
+                                  price: itemPrice,
+                                  total: itemPrice
                                 };
                                 setAdjustedItems(prev => [...prev, newItem]);
                               }
@@ -905,7 +932,9 @@ export default function OrderDetails() {
                             }}
                           >
                             <span>{p.name}</span>
-                            <span className="text-xs font-mono text-gray-500">Stock: {p.stockLevel} • GHS {p.sellingPrice}</span>
+                            <span className="text-xs font-mono text-gray-500">
+                              Stock: {p.stockLevel} • {formatCurrency(p.price ?? (p as any).sellingPrice ?? 0)}
+                            </span>
                           </button>
                         ))
                       }

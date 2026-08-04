@@ -123,10 +123,28 @@ export default function Dashboard() {
       try {
         const start = startOfDay(parseISO(dateRange.start));
         const end = endOfDay(parseISO(dateRange.end));
-        const branchFilter = selectedBranch === 'ALL' ? null : selectedBranch;
+        
+        const activeBranch = isPrivileged ? selectedBranch : (userProfile?.branchId || 'ALL');
+
+        // Resolve all branch identifiers (id, branchId field, name) for matching
+        const targetBranchIds = new Set<string>();
+        if (activeBranch !== 'ALL') {
+          targetBranchIds.add(activeBranch);
+          const foundBranch = dbBranches.find(b => b.id === activeBranch || b.branchId === activeBranch || b.name === activeBranch);
+          if (foundBranch) {
+            if (foundBranch.id) targetBranchIds.add(foundBranch.id);
+            if (foundBranch.branchId) targetBranchIds.add(foundBranch.branchId);
+            if (foundBranch.name) targetBranchIds.add(foundBranch.name);
+          }
+        }
+
+        const matchesBranch = (branchField?: string) => {
+          if (activeBranch === 'ALL' || targetBranchIds.size === 0) return true;
+          if (!branchField) return false;
+          return targetBranchIds.has(branchField);
+        };
 
         // 1. Fetch Transactions (Sales)
-        // Filter by date in Firestore, branch in JS to avoid composite index
         const transactionsQ = query(
           collection(db, 'transactions'),
           where('date', '>=', Timestamp.fromDate(start)),
@@ -136,12 +154,11 @@ export default function Dashboard() {
         const transactionsSnapshot = await getDocs(transactionsQ);
         let transactions = transactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
 
-        if (branchFilter) {
-          transactions = transactions.filter(t => t.branchId === branchFilter);
+        if (activeBranch !== 'ALL') {
+          transactions = transactions.filter(t => matchesBranch(t.branchId));
         }
 
         // 2. Fetch Expenses
-        // Filter by date in Firestore, branch in JS to avoid composite index
         const expensesQ = query(
           collection(db, 'expenses'),
           where('date', '>=', Timestamp.fromDate(start)),
@@ -151,21 +168,19 @@ export default function Dashboard() {
         const expensesSnapshot = await getDocs(expensesQ);
         let expenses = expensesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
 
-        if (branchFilter) {
-          expenses = expenses.filter(e => e.branchId === branchFilter);
+        if (activeBranch !== 'ALL') {
+          expenses = expenses.filter(e => matchesBranch(e.branchId));
         }
 
         // 3. Fetch Payroll
         let payrollQ = query(collection(db, 'payroll'), where('status', '==', 'Paid'));
-        // Note: Payroll filtering by date might be complex if it's just a month string, 
-        // but let's assume we fetch all paid for now or filter by paymentDate if exists
         const payrollSnapshot = await getDocs(payrollQ);
         const payroll = payrollSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PayrollRecord))
           .filter(p => {
             if (!p.paymentDate || !p.paymentDate.toDate) return false;
             const pDate = p.paymentDate.toDate();
             const inRange = pDate >= start && pDate <= end;
-            const branchMatch = !branchFilter || p.branchId === branchFilter;
+            const branchMatch = matchesBranch(p.branchId);
             return inRange && branchMatch;
           });
 
@@ -174,33 +189,28 @@ export default function Dashboard() {
         const debtorsSnapshot = await getDocs(debtorsQ);
         let debtors = debtorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
         
-        if (branchFilter) {
-          debtors = debtors.filter(d => d.primaryBranch === branchFilter);
+        if (activeBranch !== 'ALL') {
+          debtors = debtors.filter(d => matchesBranch(d.primaryBranch) || matchesBranch((d as any).branchId));
         }
 
         // 5. Fetch Creditors (Suppliers we owe)
-        // Fetch Suppliers for Payables
         const suppliersSnapshot = await getDocs(collection(db, 'suppliers'));
         const suppliers = suppliersSnapshot.docs.map(doc => doc.data() as Supplier);
         const totalPayables = suppliers.reduce((acc, curr) => acc + (curr.totalPayable || 0), 0);
 
-        // 6. Fetch Damaged Stock from stock_movements for accuracy (matching Inventory Report)
-        let movementsQ = query(collection(db, 'stock_movements'));
-        if (branchFilter) {
-          movementsQ = query(movementsQ, where('branchId', '==', branchFilter));
-        }
+        // 6. Fetch Damaged Stock from stock_movements
+        const movementsQ = query(collection(db, 'stock_movements'));
         const movementsSnapshot = await getDocs(movementsQ);
         const damagedMovements = movementsSnapshot.docs
           .map(doc => doc.data())
-          .filter((m: any) => m.type === 'Damage Report');
+          .filter((m: any) => m.type === 'Damage Report' && matchesBranch(m.branchId));
 
         // 7. Fetch Inventory for Restock Meter and Value calculation
-        let inventoryQ = query(collection(db, 'products'));
-        if (branchFilter) {
-          inventoryQ = query(inventoryQ, where('branchId', '==', branchFilter));
+        const inventorySnapshot = await getDocs(collection(db, 'products'));
+        let inventory = inventorySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+        if (activeBranch !== 'ALL') {
+          inventory = inventory.filter(p => matchesBranch(p.branchId));
         }
-        const inventorySnapshot = await getDocs(inventoryQ);
-        const inventory = inventorySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
         
         const totalDamagedValue = damagedMovements.reduce((acc, m: any) => {
           const product = inventory.find(p => p.id === m.productId);
@@ -219,8 +229,8 @@ export default function Dashboard() {
         const paymentsSnapshot = await getDocs(paymentsQ);
         let payments = paymentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
         
-        if (branchFilter) {
-          payments = payments.filter(p => p.branchId === branchFilter);
+        if (activeBranch !== 'ALL') {
+          payments = payments.filter(p => matchesBranch(p.branchId));
         }
         
         const totalPaymentsReceived = payments.reduce((acc, p) => acc + (p.amount || 0), 0);
@@ -249,7 +259,6 @@ export default function Dashboard() {
         const totalExp = expenses.reduce((acc, e) => acc + (e.amount || 0), 0) + 
                          payroll.reduce((acc, p) => acc + (p.netSalary || 0), 0);
         const totalReceivables = debtors.reduce((acc, d) => acc + (d.totalDebt || 0), 0);
-        // Total Revenue is now reflecting income actually received: Cash Sales + Deposits + Payments (Receivables collected)
         const totalRevenue = cashSales + depositSales + totalPaymentsReceived;
 
         // Top Customers
@@ -319,7 +328,7 @@ export default function Dashboard() {
     };
 
     fetchData();
-  }, [userProfile, dateRange, selectedBranch]);
+  }, [userProfile, dateRange, selectedBranch, dbBranches, isPrivileged]);
 
   // Activity Stream
   useEffect(() => {
@@ -618,10 +627,16 @@ export default function Dashboard() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
               <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
+              <YAxis 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fontSize: 12, fill: '#9ca3af' }} 
+                tickFormatter={(val) => Math.round(Number(val) || 0).toLocaleString()}
+              />
               <Tooltip 
                 contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
                 cursor={{ fill: '#f3f4f6' }}
+                formatter={(value: any) => [formatCurrency(Number(value) || 0), 'Sales']}
               />
               <Bar dataKey="amount" fill="url(#colorSales)" radius={[6, 6, 0, 0]} />
             </BarChart>
@@ -629,8 +644,8 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {/* Restock Meter & Branch Sales (2-grid arrangement) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Restock Meter & Branch Sales */}
+      <div className={cn("grid grid-cols-1 gap-6", isPrivileged ? "lg:grid-cols-2" : "lg:grid-cols-1")}>
         {/* Restock Meter */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
@@ -680,17 +695,17 @@ export default function Dashboard() {
         </motion.div>
 
         {/* Branch Comparison (Privileged Only) */}
-        <motion.div 
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
-        >
-          <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <ShoppingCart size={20} className="text-emerald-500" />
-            Branch Sales
-          </h2>
-          {isPrivileged ? (
+        {isPrivileged && (
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
+          >
+            <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <ShoppingCart size={20} className="text-emerald-500" />
+              Branch Sales
+            </h2>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -707,27 +722,22 @@ export default function Dashboard() {
                       <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#ef4444'][index % 4]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip formatter={(val: any) => [formatCurrency(Number(val) || 0), 'Sales']} />
                   <Legend verticalAlign="bottom" height={36}/>
                 </PieChart>
               </ResponsiveContainer>
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-center">
-              <Info className="text-gray-300 mb-2" size={32} />
-              <p className="text-sm text-gray-400">Restricted to Admin/Accountant</p>
+            
+            <div className="mt-6 space-y-3">
+              {salesByBranchWithNames.map((b, i) => (
+                <div key={i} className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">{b.name}</span>
+                  <span className="font-bold text-gray-900">{formatCurrency(b.amount)}</span>
+                </div>
+              ))}
             </div>
-          )}
-          
-          <div className="mt-6 space-y-3">
-            {salesByBranchWithNames.map((b, i) => (
-              <div key={i} className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">{b.name}</span>
-                <span className="font-bold text-gray-900">{formatCurrency(b.amount)}</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
+          </motion.div>
+        )}
       </div>
 
       {/* Top Customers & Top Debtors (2-grid columns, widened) */}
