@@ -173,13 +173,15 @@ export default function ProductDetails() {
             {product.stockLevel}
           </div>
           <div className="text-sm text-gray-500">Current Stock</div>
-          <button
-            onClick={() => setShowDeleteModal(true)}
-            className="mt-2 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium"
-            title="Delete Product"
-          >
-            <Trash2 size={14} /> Delete Record
-          </button>
+          {userProfile?.role !== 'Supervisor' && (
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="mt-2 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium"
+              title="Delete Product"
+            >
+              <Trash2 size={14} /> Delete Record
+            </button>
+          )}
         </div>
       </div>
 
@@ -214,22 +216,24 @@ export default function ProductDetails() {
       </div>
 
       {/* Actions */}
-      <div className="flex gap-4">
-        <button
-          onClick={() => setShowStockModal(true)}
-          className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 font-medium"
-        >
-          <Truck size={20} />
-          Receive New Stock
-        </button>
-        <button
-          onClick={() => setShowDamageModal(true)}
-          className="flex-1 bg-white text-red-600 border border-red-200 py-3 px-4 rounded-xl hover:bg-red-50 transition-colors flex items-center justify-center gap-2 font-medium"
-        >
-          <AlertTriangle size={20} />
-          Report Damage
-        </button>
-      </div>
+      {userProfile?.role !== 'Supervisor' && (
+        <div className="flex gap-4">
+          <button
+            onClick={() => setShowStockModal(true)}
+            className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 font-medium"
+          >
+            <Truck size={20} />
+            Receive New Stock
+          </button>
+          <button
+            onClick={() => setShowDamageModal(true)}
+            className="flex-1 bg-white text-red-600 border border-red-200 py-3 px-4 rounded-xl hover:bg-red-50 transition-colors flex items-center justify-center gap-2 font-medium"
+          >
+            <AlertTriangle size={20} />
+            Report Damage
+          </button>
+        </div>
+      )}
 
       {/* Receive Stock Modal */}
       <Modal 

@@ -248,13 +248,15 @@ export default function ClientsList() {
             <Printer size={18} />
             Print
           </button>
-          <button 
-            onClick={() => openModal()}
-            className="w-full md:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 shadow-sm transition-colors"
-          >
-            <Plus size={20} />
-            Add New Client
-          </button>
+          {userProfile?.role !== 'Supervisor' && (
+            <button 
+              onClick={() => openModal()}
+              className="w-full md:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 shadow-sm transition-colors"
+            >
+              <Plus size={20} />
+              Add New Client
+            </button>
+          )}
         </div>
       </div>
 

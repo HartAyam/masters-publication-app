@@ -175,7 +175,7 @@ const AppRoutes = () => {
         <Route element={<Layout><OrderDetails /></Layout>} path="/orders/:id" />
       </Route>
 
-      <Route element={<ProtectedRoute allowedRoles={['Cashier', 'Manager', 'Accountant', 'Director', 'Admin']} />}>
+      <Route element={<ProtectedRoute allowedRoles={['Cashier', 'Supervisor', 'Manager', 'Accountant', 'Director', 'Admin']} />}>
         <Route element={<Layout><Inventory /></Layout>} path="/inventory" />
         <Route element={<Layout><ProductDetails /></Layout>} path="/inventory/:id" />
         <Route element={<Layout><InventoryReport /></Layout>} path="/reports/inventory" />
@@ -185,7 +185,7 @@ const AppRoutes = () => {
         <Route element={<Layout><ClientDetails /></Layout>} path="/clients/:id" />
       </Route>
 
-      <Route element={<ProtectedRoute allowedRoles={['Manager', 'Accountant', 'Director', 'Admin']} />}>
+      <Route element={<ProtectedRoute allowedRoles={['Supervisor', 'Manager', 'Accountant', 'Director', 'Admin']} />}>
         <Route element={<Layout><SuppliersList /></Layout>} path="/suppliers" />
         <Route element={<Layout><SupplierDetails /></Layout>} path="/suppliers/:id" />
       </Route>
@@ -198,7 +198,7 @@ const AppRoutes = () => {
         <Route element={<Layout><AuditLogsList /></Layout>} path="/audit-logs" />
       </Route>
 
-      <Route element={<ProtectedRoute allowedRoles={['Cashier', 'Manager', 'Accountant', 'Director', 'Admin']} />}>
+      <Route element={<ProtectedRoute allowedRoles={['Cashier', 'Supervisor', 'Manager', 'Accountant', 'Director', 'Admin']} />}>
         <Route element={<Layout><BranchesList /></Layout>} path="/branches" />
         <Route element={<Layout><BranchDetails /></Layout>} path="/branches/:id" />
         <Route element={<Layout><StaffList /></Layout>} path="/staff" />

@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const ROLES: string[] = ['Cashier', 'Manager', 'Accountant', 'Director', 'Admin'];
+export const ROLES: string[] = ['Cashier', 'Supervisor', 'Manager', 'Accountant', 'Director', 'Admin'];
 
 export function isGlobalUser(role: string) {
   return ['Accountant', 'Director', 'Admin'].includes(role);

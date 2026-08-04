@@ -288,6 +288,7 @@ export default function StaffDetails() {
                     onChange={e => setRole(e.target.value as Role)}
                   >
                     <option value="Cashier">Cashier</option>
+                    <option value="Supervisor">Supervisor</option>
                     <option value="Manager">Manager</option>
                     <option value="Accountant">Accountant</option>
                     <option value="Director">Director</option>

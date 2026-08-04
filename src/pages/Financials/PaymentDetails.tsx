@@ -55,10 +55,18 @@ export default function PaymentDetails() {
         }
 
         // Fetch Branch
-        const branchQ = query(collection(db, 'branches'), where('name', '==', paymentData.branchId));
-        const branchSnapshot = await getDocs(branchQ);
-        if (!branchSnapshot.empty) {
-          setBranch({ id: branchSnapshot.docs[0].id, ...branchSnapshot.docs[0].data() as any } as BranchModel);
+        if (paymentData.branchId) {
+          const branchRef = doc(db, 'branches', paymentData.branchId);
+          const branchSnap = await getDoc(branchRef);
+          if (branchSnap.exists()) {
+            setBranch({ id: branchSnap.id, ...branchSnap.data() } as BranchModel);
+          } else {
+            const branchQ = query(collection(db, 'branches'), where('name', '==', paymentData.branchId));
+            const branchSnapshot = await getDocs(branchQ);
+            if (!branchSnapshot.empty) {
+              setBranch({ id: branchSnapshot.docs[0].id, ...branchSnapshot.docs[0].data() as any } as BranchModel);
+            }
+          }
         }
 
         // Fetch total for this payment type today
@@ -154,7 +162,7 @@ export default function PaymentDetails() {
           <div className="flex flex-col items-center text-center mb-4">
             <img src="/logo.png" alt="Logo" className="h-20 w-20 object-contain mb-2" onError={(e) => (e.currentTarget.style.display = 'none')} />
             <h1 className="text-2xl font-black text-gray-900 tracking-tighter">MASTERS PUBLICATION</h1>
-            <p className="text-base font-bold text-gray-700">{payment.branchId} Branch</p>
+            <p className="text-base font-bold text-gray-700">{branch?.name || payment.branchId} Branch</p>
             <p className="text-xs text-gray-500">{branch?.location || 'Ghana'}</p>
             <div className="flex items-center gap-4 text-xs text-gray-500">
               {branch?.contactPhone && <span><span className="font-bold">Tel:</span> {branch.contactPhone}</span>}

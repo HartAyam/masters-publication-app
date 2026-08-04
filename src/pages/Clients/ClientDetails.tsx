@@ -192,31 +192,33 @@ export default function ClientDetails() {
                 {formatCurrency(client.totalDebt)}
               </p>
             </div>
-            <div className="flex flex-col md:flex-row gap-2 justify-end">
-              <button
-                onClick={openEditModal}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm justify-center"
-              >
-                <Edit2 size={18} />
-                Edit Client
-              </button>
-              {client.totalDebt > 0 && (
-                <button 
-                  onClick={() => navigate('/payments', { state: { customerId: client.id } })}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm justify-center"
+            {userProfile?.role !== 'Supervisor' && (
+              <div className="flex flex-col md:flex-row gap-2 justify-end">
+                <button
+                  onClick={openEditModal}
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm justify-center"
                 >
-                  <CreditCard size={18} />
-                  Record Payment
+                  <Edit2 size={18} />
+                  Edit Client
                 </button>
-              )}
-              <button
-                 onClick={handleDelete}
-                 className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm justify-center"
-              >
-                <Trash2 size={18} />
-                Delete Client
-              </button>
-            </div>
+                {client.totalDebt > 0 && (
+                  <button 
+                    onClick={() => navigate('/payments', { state: { customerId: client.id } })}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm justify-center"
+                  >
+                    <CreditCard size={18} />
+                    Record Payment
+                  </button>
+                )}
+                <button
+                   onClick={handleDelete}
+                   className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm justify-center"
+                >
+                  <Trash2 size={18} />
+                  Delete Client
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

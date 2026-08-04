@@ -1,4 +1,4 @@
-export type Role = 'Cashier' | 'Manager' | 'Accountant' | 'Director' | 'Admin' | 'Marketer' | 'Driver';
+export type Role = 'Cashier' | 'Manager' | 'Accountant' | 'Director' | 'Admin' | 'Marketer' | 'Driver' | 'Supervisor';
 
 export type Branch = string;
 

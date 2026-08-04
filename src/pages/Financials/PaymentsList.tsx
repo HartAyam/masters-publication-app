@@ -54,6 +54,13 @@ export default function PaymentsList() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
+  const getBranchName = (branchIdOrName: string) => {
+    if (!branchIdOrName) return 'Main Branch';
+    if (branchIdOrName === 'ALL') return 'All Branches';
+    const found = dbBranches.find(b => b.id === branchIdOrName || b.branchId === branchIdOrName || b.name === branchIdOrName);
+    return found ? found.name : branchIdOrName;
+  };
+
   useEffect(() => {
     if (!userProfile) return;
 
@@ -185,7 +192,7 @@ export default function PaymentsList() {
       'New Debt': p.newDebt,
       Method: p.paymentMethod,
       'Received By': p.receivedBy,
-      Branch: p.branchId
+      Branch: getBranchName(p.branchId)
     }));
     exportToCSV(dataToExport, `Payments_${format(new Date(), 'yyyy-MM-dd')}`);
   };
@@ -212,13 +219,15 @@ export default function PaymentsList() {
             <Printer size={18} />
             Print
           </button>
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            <Plus size={18} />
-            Record Payment
-          </button>
+          {userProfile?.role !== 'Supervisor' && (
+            <button 
+              onClick={() => setShowAddModal(true)}
+              className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              <Plus size={18} />
+              Record Payment
+            </button>
+          )}
         </div>
       </div>
 
@@ -296,6 +305,27 @@ export default function PaymentsList() {
 
       {/* Payments Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden" id="payments-table">
+        {/* Report Print Header */}
+        <div className="p-6 border-b border-gray-100 bg-gray-50/50">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <img src="/logo.png" alt="Logo" className="h-12 w-12 object-contain" onError={(e) => (e.currentTarget.style.display = 'none')} />
+              <div>
+                <h2 className="text-lg font-black text-gray-900 tracking-tight">MASTERS PUBLICATIONS</h2>
+                <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">Customer Payments Report</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
+              <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200">
+                <span className="text-gray-400 font-medium">Branch Range:</span> <span className="font-bold text-gray-800">{selectedBranch === 'ALL' ? 'All Branches' : getBranchName(selectedBranch)}</span>
+              </div>
+              <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200">
+                <span className="text-gray-400 font-medium">Period:</span> <span className="font-bold text-gray-800">{dateRange.start} to {dateRange.end}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
           <table className="w-full text-left">
             <thead>
@@ -352,7 +382,7 @@ export default function PaymentsList() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right whitespace-nowrap">
-                      <div className="text-xs text-gray-500">{payment.branchId}</div>
+                      <div className="text-xs text-gray-500">{getBranchName(payment.branchId)}</div>
                     </td>
                   </tr>
                 ))
