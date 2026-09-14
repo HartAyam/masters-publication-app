@@ -1,4 +1,38 @@
 import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
+
+export const exportToExcel = (data: any[], filename: string, sheetName: string = 'Sheet1') => {
+  if (!data || data.length === 0) {
+    console.error('Export failed: No data provided');
+    alert('No data to export.');
+    return;
+  }
+
+  try {
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    
+    // Auto-fit column widths approximately
+    const colWidths = Object.keys(data[0] || {}).map(key => {
+      let maxLen = key.length;
+      data.forEach(row => {
+        const valStr = String(row[key] ?? '');
+        if (valStr.length > maxLen) maxLen = Math.min(valStr.length, 45);
+      });
+      return { wch: Math.max(maxLen + 2, 10) };
+    });
+    worksheet['!cols'] = colWidths;
+
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const safeFilename = filename.replace(/[/\\?%*:|"<>]/g, '-');
+    saveAs(blob, `${safeFilename}.xlsx`);
+  } catch (error) {
+    console.error('Error exporting to Excel:', error);
+    alert('Failed to export Excel file. Please try again.');
+  }
+};
 
 export const exportToCSV = (data: any[], filename: string) => {
   if (!data || data.length === 0) {

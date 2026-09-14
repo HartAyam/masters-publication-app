@@ -49,7 +49,7 @@ export default function PaymentsBySource() {
       const transactionPayments = transactionsSnapshot.docs
         .map(doc => {
           const data = doc.data() as Order;
-          if (data.amountPaid > 0) {
+          if (data.amountPaid > 0 && !data.isBackup && data.status !== 'Adjusted' && !data.referenceOnly) {
             return {
               id: `trans_${doc.id}`,
               customerId: data.customerId || '',

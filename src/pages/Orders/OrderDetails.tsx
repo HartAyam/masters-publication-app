@@ -187,8 +187,14 @@ export default function OrderDetails() {
     if (!order || processing) return;
     setProcessing(true);
     try {
-      // 1. Create backup of original
-      const { id: _, ...orderData } = order;
+      // Fetch fresh order transaction from Firestore to ensure exact stored values
+      const transactionRef = doc(db, 'transactions', order.id);
+      const txSnap = await getDoc(transactionRef);
+      const currentTxData = txSnap.exists() ? (txSnap.data() as Transaction) : order;
+      const originalTotalAmount = currentTxData.totalAmount;
+
+      // 1. Create backup of original order for reference purposes only
+      const { id: _, ...orderData } = currentTxData;
       // Remove any undefined values from orderData to avoid Firestore errors
       Object.keys(orderData).forEach(key => {
         if ((orderData as any)[key] === undefined) {
@@ -199,9 +205,12 @@ export default function OrderDetails() {
       const backupData = {
         ...orderData,
         isBackup: true,
-        status: 'Adjusted' as const,
+        referenceOnly: true,
+        status: 'Original (Archived)' as const,
         originalTransactionId: order.id,
-        adjustmentDate: serverTimestamp()
+        adjustmentDate: serverTimestamp(),
+        balanceDue: 0, // Kept for reference only, zero out balance due so it doesn't bloat customer balances
+        notes: `Original order snapshot archived prior to adjustment on ${new Date().toLocaleDateString()}`
       };
       await addDoc(collection(db, 'transactions'), backupData);
 
@@ -209,11 +218,10 @@ export default function OrderDetails() {
       const newSubtotal = adjustedItems.reduce((sum, item) => sum + item.total, 0);
       const newDiscountAmount = (adjustDiscount / 100) * newSubtotal;
       const newTotalAmount = newSubtotal - newDiscountAmount;
-      const amountDiff = order.totalAmount - newTotalAmount;
 
       // 3. Update stock for all items
       // a. Adjust stock for original items (either changed or removed)
-      for (const originalItem of order.items) {
+      for (const originalItem of currentTxData.items || order.items) {
         const adjustedItem = adjustedItems.find(i => i.productId === originalItem.productId);
         if (!adjustedItem) {
           const productRef = doc(db, 'products', originalItem.productId);
@@ -233,8 +241,8 @@ export default function OrderDetails() {
 
       // b. Deduct stock for new items added
       for (const adjustedItem of adjustedItems) {
-        const isNew = !order.items.some(i => i.productId === adjustedItem.productId);
-        if (isNew) {
+        const wasInOriginal = (currentTxData.items || order.items).some(i => i.productId === adjustedItem.productId);
+        if (!wasInOriginal) {
           const productRef = doc(db, 'products', adjustedItem.productId);
           await updateDoc(productRef, {
             stockLevel: increment(-adjustedItem.quantity)
@@ -242,22 +250,48 @@ export default function OrderDetails() {
         }
       }
 
-      // 4. Update customer debt if credit sale
-      if (order.type === 'Credit Sale' && order.customerId && amountDiff !== 0) {
-        const customerRef = doc(db, 'customers', order.customerId);
-        await updateDoc(customerRef, {
-          totalDebt: increment(-amountDiff)
-        });
+      // 4. Update customer balance:
+      // The amount from original order is added back before the new adjusted figure is then subtracted
+      let computedPrevBal = currentTxData.previousBalance;
+
+      if (currentTxData.customerId) {
+        const customerRef = doc(db, 'customers', currentTxData.customerId);
+        const customerSnap = await getDoc(customerRef);
+        
+        if (customerSnap.exists()) {
+          const custData = customerSnap.data() as Customer;
+          const currentDebt = custData.totalDebt || 0;
+          
+          if (currentTxData.type === 'Credit Sale') {
+            // Step A: Add back amount from original order to customer's balance (reduces debt)
+            const debtAfterOriginalAddedBack = currentDebt - originalTotalAmount;
+            // Step B: Subtract new adjusted figure from customer's balance (increases debt)
+            const updatedDebt = debtAfterOriginalAddedBack + newTotalAmount;
+
+            await updateDoc(customerRef, {
+              totalDebt: updatedDebt
+            });
+
+            // If previousBalance was undefined on this order, calculate what it was before this order
+            if (computedPrevBal === undefined) {
+              computedPrevBal = -debtAfterOriginalAddedBack;
+            }
+          }
+        }
       }
 
-      // 5. Update current transaction
-      const transactionRef = doc(db, 'transactions', order.id);
-      const prevBal = order.previousBalance !== undefined ? order.previousBalance : 0;
+      // 5. Update current transaction with adjusted values
+      const prevBal = computedPrevBal !== undefined ? computedPrevBal : 0;
+      const newBalanceDue = currentTxData.type === 'Credit Sale' 
+        ? (newTotalAmount - prevBal) 
+        : Math.max(0, newTotalAmount - (currentTxData.amountPaid || 0));
+
       await updateDoc(transactionRef, {
         items: adjustedItems,
         totalAmount: newTotalAmount,
         discount: adjustDiscount,
-        balanceDue: order.type === 'Credit Sale' ? newTotalAmount - prevBal : Math.max(0, newTotalAmount - order.amountPaid),
+        previousBalance: prevBal,
+        balanceDue: newBalanceDue,
         paymentMethod: adjustPaymentMethod,
         accountNumber: adjustPaymentMethod === 'Cash' ? '' : adjustAccountNumber,
         bankName: adjustPaymentMethod === 'Cash' ? '' : adjustBankName,
@@ -308,6 +342,8 @@ export default function OrderDetails() {
       const backupData = {
         ...orderData,
         isBackup: true,
+        referenceOnly: true,
+        balanceDue: 0,
         status: 'Voided' as const,
         originalTransactionId: order.id,
         voidReason: voidReason,
@@ -599,7 +635,7 @@ export default function OrderDetails() {
             <Download size={18} />
             Download
           </button>
-          {order.status !== 'Voided' && (
+          {order.status !== 'Voided' && !order.isBackup && (
             <>
               <button 
                 onClick={() => setShowAdjustModal(true)}
@@ -637,6 +673,21 @@ export default function OrderDetails() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative" id="invoice-print">
+        {order.isBackup ? (
+          <div className="bg-amber-600 text-white text-center py-3 px-6 relative z-20">
+            <div className="text-sm md:text-base font-black tracking-[0.2em] uppercase">ORIGINAL ORDER (ARCHIVED REFERENCE ONLY)</div>
+            <div className="mt-0.5 text-xs opacity-95 font-medium">
+              This is the original order archived prior to adjustment. It is preserved for reference/auditing only. Active adjusted order applies to customer balance.
+            </div>
+          </div>
+        ) : order.isAdjusted ? (
+          <div className="bg-blue-600 text-white text-center py-2 px-6 relative z-20">
+            <div className="text-xs md:text-sm font-black tracking-[0.15em] uppercase">ADJUSTED ORDER (ACTIVE)</div>
+            <div className="text-[11px] opacity-95 font-medium">
+              This adjusted receipt is active and applies to the customer's balance. (Original pre-adjustment order archived for reference).
+            </div>
+          </div>
+        ) : null}
         {order.status === 'Voided' && (
           <div className="bg-red-600 text-white text-center py-4 px-6 relative z-20">
             <div className="text-xl font-black tracking-[0.25em] uppercase">VOIDED INVOICE</div>
@@ -669,15 +720,44 @@ export default function OrderDetails() {
 
           <div className="flex flex-col items-center text-center mb-6">
             <h2 className="text-lg font-black uppercase tracking-[0.2em] text-gray-900 border-b-2 border-gray-900 px-6 pb-0.5 mb-1">
-              {order.type === 'Supply Note' ? 'Supply Note' : 'Invoice'}
+              {order.isBackup 
+                ? 'Original Order (Archived Reference)' 
+                : (order.isAdjusted 
+                    ? (order.type === 'Supply Note' ? 'Supply Note (Adjusted)' : 'Invoice (Adjusted)') 
+                    : (order.type === 'Supply Note' ? 'Supply Note' : 'Invoice'))}
             </h2>
             <p className="text-xs font-mono text-gray-500">#{order.id}</p>
             <p className="text-xs text-gray-900 mt-0.5 uppercase tracking-widest font-bold">
               Date: {order.date?.toDate ? format(order.date.toDate(), 'dd MMM yyyy, HH:mm') : (order.date ? format(new Date(order.date), 'dd MMM yyyy, HH:mm') : 'N/A')}
             </p>
             {order.originalTransactionId && (
-              <p className="text-[10px] text-gray-400 mt-0.5">Ref: #{order.originalTransactionId}</p>
+              <p className="text-xs font-medium text-amber-700 mt-0.5">
+                {order.isBackup ? `Active Adjusted Order: #${order.originalTransactionId}` : `Adjusted from Original Order: #${order.originalTransactionId}`}
+              </p>
             )}
+            <div className="mt-2 flex items-center justify-center gap-2">
+              {order.isBackup ? (
+                <span className="px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
+                  Original Order (Archived Reference)
+                </span>
+              ) : (
+                <>
+                  <span className={`px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                    order.status === 'Completed' ? 'bg-green-100 text-green-800 border border-green-200' :
+                    order.status === 'Pending Payment' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                    order.status === 'Returned' ? 'bg-red-100 text-red-800 border border-red-200' :
+                    'bg-gray-100 text-gray-800 border border-gray-200'
+                  }`}>
+                    {order.status}
+                  </span>
+                  {order.isAdjusted && (
+                    <span className="px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
+                      Adjusted
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-6 mb-6">
@@ -774,9 +854,13 @@ export default function OrderDetails() {
               )}
               {order.type === 'Credit Sale' && (
                 <tr className="bg-gray-900 text-white">
-                  <td colSpan={3} className="py-2 text-right text-xs font-black uppercase tracking-widest px-4">Balance Due</td>
+                  <td colSpan={3} className="py-2 text-right text-xs font-black uppercase tracking-widest px-4">
+                    {order.isBackup ? 'Balance Due (Ref Only)' : 'Balance Due'}
+                  </td>
                   <td className="py-2 text-right text-base font-black px-4">
-                    {formatCurrency(order.balanceDue !== undefined ? order.balanceDue : (order.totalAmount - previousBalance))}
+                    {order.isBackup 
+                      ? 'Ref Only (See Adjusted Order)' 
+                      : formatCurrency(order.balanceDue !== undefined ? order.balanceDue : (order.totalAmount - previousBalance))}
                   </td>
                 </tr>
               )}

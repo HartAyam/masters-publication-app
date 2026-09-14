@@ -5,7 +5,7 @@ import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/
 import { Transaction, Branch, BranchModel } from '../../types';
 import { isGlobalUser } from '../../lib/utils';
 import { useBranches } from '@/hooks/useBranches';
-import { Search, Plus, ChevronRight, CheckSquare, Square, Calendar, Download, Printer } from 'lucide-react';
+import { Search, Plus, ChevronRight, CheckSquare, Square, Calendar, Download, Printer, Archive } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { exportToCSV, printDiv } from '@/lib/exportUtils';
 import { format } from 'date-fns';
@@ -28,12 +28,16 @@ export default function OrdersList() {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [showBackups, setShowBackups] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   useEffect(() => {
     if (!userProfile) return;
     fetchOrders();
   }, [userProfile]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedBranch, selectedStatus, selectedType, showBackups, itemsPerPage]);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -96,17 +100,22 @@ export default function OrdersList() {
       order.id.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesBranch = selectedBranch === 'ALL' || order.branchId === selectedBranch;
-    const matchesStatus = selectedStatus === 'ALL' || order.status === selectedStatus;
+    const matchesStatus = selectedStatus === 'ALL' 
+      ? true 
+      : selectedStatus === 'Adjusted'
+        ? (order.isAdjusted || order.status === 'Adjusted' || order.status === 'Original (Archived)')
+        : order.status === selectedStatus;
     const matchesType = selectedType === 'ALL' || order.type === selectedType;
     const matchesBackup = showBackups ? order.isBackup : !order.isBackup;
 
     return matchesSearch && matchesBranch && matchesStatus && matchesType && matchesBackup;
   });
 
-  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / itemsPerPage));
+  const validCurrentPage = Math.min(currentPage, totalPages);
   const paginatedOrders = filteredOrders.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    (validCurrentPage - 1) * itemsPerPage,
+    validCurrentPage * itemsPerPage
   );
 
   const toggleSelectAll = () => {
@@ -222,18 +231,33 @@ export default function OrdersList() {
           <div className="flex items-center gap-2 px-2">
             <button 
               onClick={() => setShowBackups(!showBackups)}
-              className={`p-2 rounded-lg border transition-colors ${showBackups ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-white border-gray-200 text-gray-400'}`}
-              title="Show Adjusted Backups"
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${showBackups ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-sm' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+              title="Show Original Archived Orders"
             >
-              <Calendar size={20} />
+              <Archive size={16} className={showBackups ? 'text-amber-800' : 'text-gray-400'} />
+              <span>{showBackups ? 'Hide Archived Originals' : 'Show Archived Originals'}</span>
             </button>
-            <span className="text-xs text-gray-500 font-medium whitespace-nowrap">Show Backups</span>
           </div>
         </div>
       </div>
 
       {/* Orders List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden" id="orders-table">
+        {showBackups && (
+          <div className="bg-amber-50 border-b border-amber-200 p-3 px-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-amber-900">
+            <div className="flex items-center gap-2">
+              <Archive size={16} className="text-amber-700 shrink-0" />
+              <span className="font-bold">Viewing Archived Original Orders (Pre-Adjustment Reference Only)</span>
+              <span className="text-amber-800 hidden md:inline">— These are historical records prior to adjustments. Active adjusted orders are in the main list.</span>
+            </div>
+            <button 
+              onClick={() => setShowBackups(false)}
+              className="text-amber-800 hover:text-amber-950 font-bold underline shrink-0"
+            >
+              Return to Active Orders
+            </button>
+          </div>
+        )}
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
           <table className="w-full text-left">
             <thead>
@@ -304,14 +328,28 @@ export default function OrdersList() {
                       </span>
                     </td>
                     <td className="p-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                        ${order.status === 'Completed' ? 'bg-green-100 text-green-800' : 
-                          order.status === 'Pending Payment' ? 'bg-yellow-100 text-yellow-800' :
-                          order.status === 'Returned' ? 'bg-red-100 text-red-800' :
-                          order.status === 'Adjusted' ? 'bg-amber-100 text-amber-800' :
-                          'bg-gray-100 text-gray-800'}`}>
-                        {order.status}
-                      </span>
+                      <div className="flex flex-col gap-1 items-start">
+                        {order.isBackup ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                            Original (Archived)
+                          </span>
+                        ) : (
+                          <>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                              ${order.status === 'Completed' ? 'bg-green-100 text-green-800' : 
+                                order.status === 'Pending Payment' ? 'bg-yellow-100 text-yellow-800' :
+                                order.status === 'Returned' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'}`}>
+                              {order.status}
+                            </span>
+                            {order.isAdjusted && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                Adjusted
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </td>
                     {isGlobalUser(userProfile?.role || '') && (
                       <td className="p-4 text-sm text-gray-500">
@@ -327,17 +365,21 @@ export default function OrdersList() {
             </tbody>
           </table>
         </div>
-      </div>
 
-      {totalPages > 1 && (
-        <div className="mt-6 flex justify-center">
-          <Pagination 
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-          />
-        </div>
-      )}
+        <Pagination 
+          currentPage={validCurrentPage}
+          totalPages={totalPages}
+          totalItems={filteredOrders.length}
+          itemsPerPage={itemsPerPage}
+          itemName="orders"
+          pageSizeOptions={[20, 50, 100]}
+          onItemsPerPageChange={(newSize) => {
+            setItemsPerPage(newSize);
+            setCurrentPage(1);
+          }}
+          onPageChange={setCurrentPage}
+        />
+      </div>
     </div>
   );
 }

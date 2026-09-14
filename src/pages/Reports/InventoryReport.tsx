@@ -79,14 +79,14 @@ export default function InventoryReport() {
           .reduce((sum, m) => sum + m.quantity, 0);
 
         const sold = transactionsInPeriod
-          .filter(t => t.type === 'Cash Sale' || t.type === 'Credit Sale' || t.type === 'Supply Note')
+          .filter(t => !t.isBackup && t.status !== 'Adjusted' && !t.referenceOnly && (t.type === 'Cash Sale' || t.type === 'Credit Sale' || t.type === 'Supply Note'))
           .reduce((sum, t) => {
             const item = t.items.find(i => i.productId === product.id);
             return sum + (item?.quantity || 0);
           }, 0);
 
         const deposits = transactions
-          .filter(t => t.type === 'Deposit' && t.status !== 'Supplied')
+          .filter(t => !t.isBackup && t.status !== 'Adjusted' && !t.referenceOnly && t.type === 'Deposit' && t.status !== 'Supplied')
           .reduce((sum, t) => {
             const item = t.items.find(i => i.productId === product.id);
             if (!item) return sum;
@@ -100,6 +100,7 @@ export default function InventoryReport() {
         );
         
         const allTransactionsAfterStart = transactions.filter(t => 
+          !t.isBackup && t.status !== 'Adjusted' && !t.referenceOnly &&
           t.items.some(i => i.productId === product.id) &&
           t.date?.toDate() >= start
         );
