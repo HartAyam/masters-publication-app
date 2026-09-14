@@ -674,14 +674,14 @@ export default function OrderDetails() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative" id="invoice-print">
         {order.isBackup ? (
-          <div className="bg-amber-600 text-white text-center py-3 px-6 relative z-20">
+          <div className="bg-amber-600 text-white text-center py-3 px-6 relative z-20 no-print print:hidden print-hidden" data-print-hide="true">
             <div className="text-sm md:text-base font-black tracking-[0.2em] uppercase">ORIGINAL ORDER (ARCHIVED REFERENCE ONLY)</div>
             <div className="mt-0.5 text-xs opacity-95 font-medium">
               This is the original order archived prior to adjustment. It is preserved for reference/auditing only. Active adjusted order applies to customer balance.
             </div>
           </div>
         ) : order.isAdjusted ? (
-          <div className="bg-blue-600 text-white text-center py-2 px-6 relative z-20">
+          <div className="bg-blue-600 text-white text-center py-2 px-6 relative z-20 no-print print:hidden print-hidden" data-print-hide="true">
             <div className="text-xs md:text-sm font-black tracking-[0.15em] uppercase">ADJUSTED ORDER (ACTIVE)</div>
             <div className="text-[11px] opacity-95 font-medium">
               This adjusted receipt is active and applies to the customer's balance. (Original pre-adjustment order archived for reference).
@@ -689,7 +689,7 @@ export default function OrderDetails() {
           </div>
         ) : null}
         {order.status === 'Voided' && (
-          <div className="bg-red-600 text-white text-center py-4 px-6 relative z-20">
+          <div className="bg-red-600 text-white text-center py-4 px-6 relative z-20 no-print print:hidden print-hidden" data-print-hide="true">
             <div className="text-xl font-black tracking-[0.25em] uppercase">VOIDED INVOICE</div>
             {order.voidReason && (
               <div className="mt-1 text-sm opacity-90 font-medium">

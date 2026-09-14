@@ -73,6 +73,10 @@ export const printDiv = (divId: string, title: string) => {
     return;
   }
 
+  // Clone element and strip elements that must never appear in printouts
+  const clone = element.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll('.no-print, .print\\:hidden, .print-hidden, [data-print-hide="true"]').forEach(el => el.remove());
+
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
     alert('Pop-up blocked! Please allow pop-ups for this site to print.');
@@ -92,17 +96,18 @@ export const printDiv = (divId: string, title: string) => {
         <style>
           @media print {
             body { padding: 0; margin: 0; }
-            .no-print, .print\\:hidden { display: none !important; }
+            .no-print, .print\\:hidden, .print-hidden, [data-print-hide="true"] { display: none !important; }
             /* Force background colors in print */
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             @page { margin: 1cm; }
           }
+          .no-print, .print\\:hidden, .print-hidden, [data-print-hide="true"] { display: none !important; }
           body { font-family: sans-serif; padding: 20px; }
         </style>
       </head>
       <body>
         <div class="print-container">
-          ${element.innerHTML}
+          ${clone.innerHTML}
         </div>
         <script>
           window.onload = () => {

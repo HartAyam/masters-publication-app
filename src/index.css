@@ -37,3 +37,12 @@
     scrollbar-width: none;
   }
 }
+
+@media print {
+  .no-print,
+  .print\:hidden,
+  .print-hidden,
+  [data-print-hide="true"] {
+    display: none !important;
+  }
+}

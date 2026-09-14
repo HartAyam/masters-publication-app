@@ -1,12 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, orderBy, limit, onSnapshot, QuerySnapshot, DocumentData, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, onSnapshot, QuerySnapshot, DocumentData, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { Expense } from '@/types';
 import { logActivity } from '@/services/audit';
 import { Download, Printer, Search, Plus, Filter, Calendar, CreditCard, User, ArrowRight, X, Trash2, Edit, Save, AlertTriangle } from 'lucide-react';
 import { exportToCSV, printDiv } from '@/lib/exportUtils';
-import { format, startOfWeek, startOfMonth, startOfQuarter, startOfYear, isAfter } from 'date-fns';
+import { 
+  format, 
+  startOfDay, 
+  endOfDay, 
+  startOfWeek, 
+  startOfMonth, 
+  endOfMonth, 
+  subMonths, 
+  startOfQuarter, 
+  startOfYear, 
+  isAfter, 
+  isBefore, 
+  isWithinInterval 
+} from 'date-fns';
 import { formatCurrency } from '@/lib/idUtils';
 import Pagination from '@/components/common/Pagination';
 import { Branch, BranchModel } from '@/types';
@@ -47,35 +60,48 @@ export default function Expenses() {
   // Ledger State
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [dateFilter, setDateFilter] = useState<'ALL' | 'WEEK' | 'MONTH' | 'QUARTER' | 'YEAR'>('ALL');
+  const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'WEEK' | 'MONTH' | 'LAST_MONTH' | 'QUARTER' | 'YEAR' | 'CUSTOM'>('ALL');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedBranch, setSelectedBranch] = useState<string | 'ALL'>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
+  // Helper to reliably parse expense dates
+  const getExpenseDate = (d: any): Date => {
+    if (!d) return new Date();
+    if (typeof d.toDate === 'function') return d.toDate();
+    if (d.seconds) return new Date(d.seconds * 1000);
+    const parsed = new Date(d);
+    return isNaN(parsed.getTime()) ? new Date() : parsed;
+  };
+
   useEffect(() => {
     if (!userProfile) return;
 
+    // Expand query to pull ALL expense records logged without hardcoded limit
     let q;
     if (isGlobalUser(userProfile.role)) {
-      q = query(collection(db, 'expenses'), orderBy('date', 'desc'), limit(50));
+      q = query(collection(db, 'expenses'));
     } else {
       q = query(
         collection(db, 'expenses'), 
-        where('branchId', '==', userProfile.branchId),
-        orderBy('date', 'desc'),
-        limit(50)
+        where('branchId', '==', userProfile.branchId)
       );
     }
 
     const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
-      // snapshot is QuerySnapshot here because q is a Query
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
+      // Sort in-memory to guarantee descending order and avoid missing index constraints
+      data.sort((a, b) => {
+        const timeA = getExpenseDate(a.date).getTime();
+        const timeB = getExpenseDate(b.date).getTime();
+        return timeB - timeA;
+      });
       setExpenses(data);
     }, (error: any) => {
       console.error("Error fetching expenses:", error);
-      if (error.code === 'failed-precondition' && error.message.includes('index')) {
-        console.warn("Missing Firestore Index for Expenses. Please create it using the link in the console.");
-      }
     });
 
     return () => unsubscribe();
@@ -84,24 +110,48 @@ export default function Expenses() {
   const filteredExpenses = expenses.filter(expense => {
     const matchesSearch = expense.recipient.toLowerCase().includes(searchTerm.toLowerCase()) ||
       expense.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      expense.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      expense.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      expense.approverName?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesCategory = selectedCategory === 'ALL' || expense.category === selectedCategory;
 
     let matchesDate = true;
-    const now = new Date();
-    if (dateFilter === 'WEEK') {
-      matchesDate = expense.date?.seconds && isAfter(new Date(expense.date.seconds * 1000), startOfWeek(now));
-    } else if (dateFilter === 'MONTH') {
-      matchesDate = expense.date?.seconds && isAfter(new Date(expense.date.seconds * 1000), startOfMonth(now));
-    } else if (dateFilter === 'QUARTER') {
-      matchesDate = expense.date?.seconds && isAfter(new Date(expense.date.seconds * 1000), startOfQuarter(now));
-    } else if (dateFilter === 'YEAR') {
-      matchesDate = expense.date?.seconds && isAfter(new Date(expense.date.seconds * 1000), startOfYear(now));
+    if (dateFilter !== 'ALL') {
+      const expDate = getExpenseDate(expense.date);
+      const now = new Date();
+      if (dateFilter === 'TODAY') {
+        matchesDate = isAfter(expDate, startOfDay(now));
+      } else if (dateFilter === 'WEEK') {
+        matchesDate = isAfter(expDate, startOfWeek(now, { weekStartsOn: 1 }));
+      } else if (dateFilter === 'MONTH') {
+        matchesDate = isAfter(expDate, startOfMonth(now));
+      } else if (dateFilter === 'LAST_MONTH') {
+        const prevMonth = subMonths(now, 1);
+        matchesDate = isWithinInterval(expDate, { start: startOfMonth(prevMonth), end: endOfMonth(prevMonth) });
+      } else if (dateFilter === 'QUARTER') {
+        matchesDate = isAfter(expDate, startOfQuarter(now));
+      } else if (dateFilter === 'YEAR') {
+        matchesDate = isAfter(expDate, startOfYear(now));
+      } else if (dateFilter === 'CUSTOM') {
+        if (customStartDate && customEndDate) {
+          matchesDate = isWithinInterval(expDate, {
+            start: startOfDay(new Date(customStartDate)),
+            end: endOfDay(new Date(customEndDate))
+          });
+        } else if (customStartDate) {
+          matchesDate = isAfter(expDate, startOfDay(new Date(customStartDate)));
+        } else if (customEndDate) {
+          matchesDate = isBefore(expDate, endOfDay(new Date(customEndDate)));
+        }
+      }
     }
 
     const matchesBranch = selectedBranch === 'ALL' || expense.branchId === selectedBranch;
 
-    return matchesSearch && matchesDate && matchesBranch;
+    return matchesSearch && matchesCategory && matchesDate && matchesBranch;
   });
+
+  const totalFilteredAmount = filteredExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
 
   const totalPages = Math.ceil(filteredExpenses.length / itemsPerPage);
   const paginatedExpenses = filteredExpenses.slice(
@@ -153,12 +203,13 @@ export default function Expenses() {
 
   const handleExport = () => {
     const dataToExport = filteredExpenses.map(e => ({
-      Date: e.date?.toDate ? format(e.date.toDate(), 'yyyy-MM-dd HH:mm') : 'N/A',
+      Date: e.date ? format(getExpenseDate(e.date), 'yyyy-MM-dd HH:mm') : 'N/A',
       Amount: e.amount,
       Category: e.category,
       Recipient: e.recipient,
       Description: e.description || '',
-      Branch: e.branchId
+      Branch: dbBranches.find(b => b.id === e.branchId || b.name === e.branchId)?.name || e.branchId,
+      Approver: e.approverName || ''
     }));
     exportToCSV(dataToExport, `Expenses_${format(new Date(), 'yyyy-MM-dd')}`);
   };
@@ -255,46 +306,99 @@ export default function Expenses() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap items-center gap-4">
-        <div className="flex-1 min-w-[200px] relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            type="text"
-            placeholder="Search recipient, category..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <Filter size={18} className="text-gray-400" />
-          <select 
-            className="p-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={dateFilter}
-            onChange={(e: any) => setDateFilter(e.target.value)}
-          >
-            <option value="ALL">All Time</option>
-            <option value="WEEK">This Week</option>
-            <option value="MONTH">This Month</option>
-            <option value="QUARTER">This Quarter</option>
-            <option value="YEAR">This Year</option>
-          </select>
+      {/* Filters & Controls */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-3">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex-1 min-w-[200px] relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input 
+              type="text"
+              placeholder="Search recipient, category, approver..."
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Filter size={16} className="text-gray-400" />
+            <select 
+              className="p-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+            >
+              <option value="ALL">All Categories</option>
+              <option value="Operations">Operations</option>
+              <option value="Utilities">Utilities</option>
+              <option value="Salary">Salary</option>
+              <option value="Maintenance">Maintenance</option>
+              <option value="Restock">Restock</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Calendar size={16} className="text-gray-400" />
+            <select 
+              className="p-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={dateFilter}
+              onChange={(e: any) => setDateFilter(e.target.value)}
+            >
+              <option value="ALL">All Time (All Records)</option>
+              <option value="TODAY">Today</option>
+              <option value="WEEK">This Week</option>
+              <option value="MONTH">This Month</option>
+              <option value="LAST_MONTH">Last Month</option>
+              <option value="QUARTER">This Quarter</option>
+              <option value="YEAR">This Year</option>
+              <option value="CUSTOM">Custom Range</option>
+            </select>
+          </div>
+
+          {dateFilter === 'CUSTOM' && (
+            <div className="flex items-center gap-2">
+              <input 
+                type="date"
+                className="p-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                placeholder="From"
+              />
+              <span className="text-gray-400 text-xs">to</span>
+              <input 
+                type="date"
+                className="p-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                placeholder="To"
+              />
+            </div>
+          )}
+
+          {isGlobalUser(userProfile?.role) && (
+            <select 
+              className="p-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={selectedBranch}
+              onChange={(e: any) => setSelectedBranch(e.target.value)}
+            >
+              <option value="ALL">All Branches</option>
+              {dbBranches.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          )}
         </div>
 
-        {isGlobalUser(userProfile?.role) && (
-          <select 
-            className="p-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={selectedBranch}
-            onChange={(e: any) => setSelectedBranch(e.target.value)}
-          >
-            <option value="ALL">All Branches</option>
-            {dbBranches.map(b => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-        )}
+        {/* Summary metrics strip */}
+        <div className="pt-2 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+          <div>
+            Showing <span className="font-bold text-gray-900">{filteredExpenses.length}</span> of <span className="font-bold text-gray-900">{expenses.length}</span> total expense records logged
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span>Filtered Total:</span>
+            <span className="font-bold text-blue-600 text-sm">{formatCurrency(totalFilteredAmount)}</span>
+          </div>
+        </div>
       </div>
       
       {/* Create Voucher Modal */}
@@ -435,8 +539,8 @@ export default function Expenses() {
                       setShowDeleteConfirm(false);
                     }}
                   >
-                    <td className="p-4 text-gray-500">
-                      {expense.date?.seconds ? new Date(expense.date.seconds * 1000).toLocaleDateString() : 'Just now'}
+                    <td className="p-4 text-gray-500 whitespace-nowrap">
+                      {expense.date ? format(getExpenseDate(expense.date), 'dd MMM yyyy, HH:mm') : 'N/A'}
                     </td>
                     <td className="p-4 font-medium text-gray-900">{expense.recipient}</td>
                     <td className="p-4 text-gray-500">
@@ -610,7 +714,7 @@ export default function Expenses() {
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Date</p>
                   <p className="font-medium text-gray-900">
-                    {selectedExpense.date?.seconds ? format(new Date(selectedExpense.date.seconds * 1000), 'PPP p') : 'Just now'}
+                    {selectedExpense.date ? format(getExpenseDate(selectedExpense.date), 'PPP p') : 'N/A'}
                   </p>
                 </div>
               </div>
